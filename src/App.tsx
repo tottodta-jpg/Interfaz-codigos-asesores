@@ -433,7 +433,7 @@ export default function App() {
                           <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                             <span className="truncate max-w-[200px] font-bold text-blue-500 dark:text-blue-400">{displayEmail}</span>
                           </div>
-                          <p className="text-xs sm:text-sm text-gray-600 dark:text-white font-bold mt-1 uppercase tracking-wider">{item.time}</p>
+                          <p className="text-xs text-gray-600 dark:text-white font-bold mt-1 uppercase tracking-wider">{item.time}</p>
                         </div>
                       </div>
 
