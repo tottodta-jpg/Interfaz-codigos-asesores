@@ -191,20 +191,24 @@ export default function App() {
     }
   };
 
-  // FUNCIÓN DE EXTRACCIÓN MEJORADA: Filtra estrictamente GoPlay y Gomakers
+  /**
+   * getDisplayEmail: Lógica segura para GoPlay
+   * Escanea subject y body SOLO si el remitente es GoPlay.
+   * NO afecta a correos de cPanel ni Hotmail.
+   */
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
     
-    // Si el remitente es GoPlay, buscamos el email real en todos los campos de texto
+    // Si el remitente es GoPlay, buscamos el email real en el texto
     if (sender.includes('goplay')) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
       
-      // Combinamos campos donde GoPlay suele escribir la cuenta
+      // Escaneamos subject y body (enviados desde Make)
       const textToScan = `${item.subject || ''} ${item.body || ''} ${item.destinatario || ''} ${item.code || ''}`;
       const matches = textToScan.match(emailRegex);
       
       if (matches) {
-        // Buscamos un email que NO contenga palabras prohibidas del sistema
+        // Buscamos un email que NO sea goplay ni gomakers
         const realAccount = matches.find(e => {
             const low = e.toLowerCase();
             return !low.includes('goplay') && !low.includes('gomakers');
@@ -213,7 +217,7 @@ export default function App() {
       }
     }
 
-    // Lógica para servicios que funcionan bien (Disney cPanel, Hotmail, etc)
+    // Lógica para servicios estándar (Disney cPanel, Hotmail, etc)
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
     if (isBot && item.destinatario) return item.destinatario;
 
