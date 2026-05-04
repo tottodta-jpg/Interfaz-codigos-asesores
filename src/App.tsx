@@ -111,8 +111,9 @@ export default function App() {
 
         if (data.timestamp) {
           if (data.timestamp.toDate) {
-            docTimeMs = data.timestamp.toDate().getTime();
-            timeString = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+            const dateObj = data.timestamp.toDate();
+            docTimeMs = dateObj.getTime();
+            timeString = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
           } else {
             const parsedMs = new Date(data.timestamp).getTime();
             if (!isNaN(parsedMs)) {
@@ -125,30 +126,41 @@ export default function App() {
         if (needsCleanup && docTimeMs < startOfToday) {
           docsToDelete.push(docSnapshot.id);
         } else {
-          let finalService = data.service;
+          // Normalizamos el nombre del servicio (quitamos espacios que puedan venir de Make)
+          let finalService = (data.service || 'Netflix').trim();
           const senderEmail = (data.email || '').toLowerCase(); 
           
           if (senderEmail.includes('microsoft') || senderEmail.includes('outlook')) {
             finalService = 'Hotmail';
           }
 
-          fetchedCodes.push({ id: docSnapshot.id, ...data, service: finalService, time: timeString, _sortTime: docTimeMs });
+          fetchedCodes.push({ 
+            id: docSnapshot.id, 
+            ...data, 
+            service: finalService, 
+            time: timeString, 
+            _sortTime: docTimeMs 
+          });
         }
       });
 
-      if (needsCleanup && docsToDelete.length > 0) {
-        const processBatches = async () => {
-          const batches = [];
-          for (let i = 0; i < docsToDelete.length; i += 500) {
-            const batch = writeBatch(db);
-            docsToDelete.slice(i, i + 500).forEach(id => {
-              batch.delete(doc(db, 'received_codes', id));
-            });
-            batches.push(batch.commit());
-          }
-          await Promise.all(batches);
-        };
-        processBatches();
+      // Si entramos en modo limpieza, ejecutamos los borrados y actualizamos la fecha de control
+      if (needsCleanup) {
+        if (docsToDelete.length > 0) {
+          const processBatches = async () => {
+            const batches = [];
+            for (let i = 0; i < docsToDelete.length; i += 500) {
+              const batch = writeBatch(db);
+              docsToDelete.slice(i, i + 500).forEach(id => {
+                batch.delete(doc(db, 'received_codes', id));
+              });
+              batches.push(batch.commit());
+            }
+            await Promise.all(batches);
+          };
+          processBatches();
+        }
+        // Actualizamos la marca de tiempo de limpieza hoy para no volver a entrar en este bucle
         localStorage.setItem('lastAutoClearDate', todayStr);
       }
       
@@ -156,6 +168,8 @@ export default function App() {
       setCodes(fetchedCodes); 
       setLoading(false);
     }, (error) => {
+      console.error("Error en Firebase:", error);
+      showNotification("Error de conexión con la base de datos", "error");
       setLoading(false);
     });
 
@@ -181,6 +195,7 @@ export default function App() {
       showNotification(`Código copiado al portapapeles`, 'success');
       markAsRead(id);
 
+      // Feedback visual del botón
       setCopiedStates(prev => ({ ...prev, [id]: true }));
       setTimeout(() => {
         setCopiedStates(prev => ({ ...prev, [id]: false }));
@@ -192,23 +207,24 @@ export default function App() {
   };
 
   /**
-   * getDisplayEmail: Lógica segura para GoPlay
-   * Escanea subject y body SOLO si el remitente es GoPlay.
-   * NO afecta a correos de cPanel ni Hotmail.
+   * getDisplayEmail: Lógica ultra-segura para GoPlay
+   * Escanea absolutamente todos los campos buscando un email que NO sea del sistema.
    */
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
     
-    // Si el remitente es GoPlay, buscamos el email real en el texto
-    if (sender.includes('goplay')) {
+    // Si el remitente es de GoPlay, o si los campos habituales contienen gomakers/goplay
+    const isGeneric = sender.includes('goplay') || sender.includes('gomakers');
+
+    if (isGeneric) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
       
-      // Combinamos campos donde GoPlay suele escribir la cuenta
+      // Combinamos todos los textos posibles donde pueda estar la cuenta real
       const textToScan = `${item.subject || ''} ${item.body || ''} ${item.destinatario || ''} ${item.code || ''}`;
       const matches = textToScan.match(emailRegex);
       
       if (matches) {
-        // Buscamos un email que NO sea goplay ni gomakers
+        // Buscamos el primer email que NO sea goplay ni gomakers
         const realAccount = matches.find(e => {
             const low = e.toLowerCase();
             return !low.includes('goplay') && !low.includes('gomakers');
@@ -219,16 +235,20 @@ export default function App() {
 
     // Lógica para servicios estándar (Disney cPanel, Hotmail, etc)
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
-    if (isBot && item.destinatario) return item.destinatario;
+    if (isBot && item.destinatario && !item.destinatario.toLowerCase().includes('goplay')) {
+        return item.destinatario;
+    }
 
-    return item.email || '';
+    return item.email || 'Sin correo';
   };
 
   const filteredCodes = useMemo(() => {
     return codes.filter(item => {
       const displayEmail = getDisplayEmail(item).toLowerCase();
       const matchesSearch = displayEmail.includes(searchTerm.toLowerCase()) || 
-                           (item.subject || '').toLowerCase().includes(searchTerm.toLowerCase());
+                           (item.subject || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           (item.code || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
       const matchesService = filterService === 'All' || item.service === filterService;
       const domain = displayEmail.includes('@') ? displayEmail.split('@')[1] : '';
       const matchesDomain = filterDomain === 'All' || domain === filterDomain;
@@ -411,7 +431,7 @@ export default function App() {
                             {item.status === 'new' && <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">NUEVO</span>}
                           </div>
                           <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                            <span className="truncate max-w-[200px] font-medium">{displayEmail}</span>
+                            <span className="truncate max-w-[200px] font-bold text-blue-500 dark:text-blue-400">{displayEmail}</span>
                           </div>
                           <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-wider">{item.time}</p>
                         </div>
