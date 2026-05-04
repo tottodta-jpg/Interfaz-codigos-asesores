@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Mail, ShieldAlert, RefreshCw, Search, CheckCircle2, AlertCircle, Tv, Film, ExternalLink, Moon, Sun, ChevronLeft, ChevronRight, Inbox, Video, Trash2, Lock, LogOut, Filter } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, onSnapshot, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
+// IMPORTANTE: Se añadió writeBatch para borrar de forma masiva sin lag
+import { getFirestore, collection, query, onSnapshot, doc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 
 // TUS LLAVES REALES DE FIREBASE
 const firebaseConfig = {
@@ -71,13 +72,24 @@ export default function App() {
     setTimeout(() => setNotification(null), 3000);
   }, []);
 
-  // --- LIMPIEZA MANUAL PROFUNDA (Botón "Limpiar BD") ---
+  // --- LIMPIEZA MANUAL PROFUNDA MEJORADA (Sin lag) ---
   const handleClearAll = useCallback(async () => {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, 'received_codes'));
-      const deletePromises = snapshot.docs.map(docSnap => deleteDoc(doc(db, 'received_codes', docSnap.id)));
-      await Promise.all(deletePromises);
+      
+      // Empacamos las órdenes de borrar en lotes de 500 para no bloquear la interfaz
+      const batches = [];
+      for (let i = 0; i < snapshot.docs.length; i += 500) {
+        const batch = writeBatch(db);
+        snapshot.docs.slice(i, i + 500).forEach(docSnap => {
+          batch.delete(doc(db, 'received_codes', docSnap.id));
+        });
+        batches.push(batch.commit());
+      }
+      
+      // Ejecutamos todos los lotes de golpe
+      await Promise.all(batches);
       
       setShowClearConfirm(false);
       showNotification('Base de datos limpiada completamente', 'success');
@@ -88,71 +100,8 @@ export default function App() {
     setLoading(false);
   }, [showNotification]);
 
-  // --- LÓGICA DE LIMPIEZA INTELIGENTE RETROACTIVA (Solo borra lo de ayer) ---
-  useEffect(() => {
-    if (!isAuthenticated) return;
 
-    const checkAndAutoClear = async () => {
-      const now = new Date();
-      const todayStr = now.toLocaleDateString();
-      const lastClear = localStorage.getItem('lastAutoClearDate');
-
-      // Si es un día nuevo, ejecutamos la limpieza inteligente
-      if (lastClear !== todayStr) {
-        try {
-          const snapshot = await getDocs(collection(db, 'received_codes'));
-          
-          // Calculamos la hora exacta en la que inició el día de hoy (Medianoche)
-          const startOfToday = new Date();
-          startOfToday.setHours(0, 0, 0, 0);
-          const todayMs = startOfToday.getTime();
-          
-          const deletePromises = [];
-          
-          snapshot.docs.forEach(docSnap => {
-            const data = docSnap.data();
-            let docTimeMs = Date.now(); // Por defecto asume que es nuevo para protegerlo en caso de error
-            
-            // Extraemos la fecha del código con precisión
-            if (data.timestamp) {
-              if (data.timestamp.toDate) {
-                docTimeMs = data.timestamp.toDate().getTime();
-              } else if (typeof data.timestamp === 'string' || typeof data.timestamp === 'number') {
-                const parsedMs = new Date(data.timestamp).getTime();
-                if (!isNaN(parsedMs)) docTimeMs = parsedMs;
-              }
-            }
-
-            // Si la fecha del documento es anterior a la medianoche de hoy, lo marcamos para borrar
-            if (docTimeMs < todayMs) {
-              deletePromises.push(deleteDoc(doc(db, 'received_codes', docSnap.id)));
-            }
-          });
-
-          // Si encontró códigos viejos, los borra
-          if (deletePromises.length > 0) {
-            await Promise.all(deletePromises);
-            showNotification(`Mantenimiento matutino: ${deletePromises.length} códigos de días anteriores eliminados.`, 'success');
-          }
-
-          // Guardamos que ya se hizo la revisión de hoy
-          localStorage.setItem('lastAutoClearDate', todayStr);
-        } catch (error) {
-          console.error("Error en limpieza automática:", error);
-        }
-      }
-    };
-
-    // 1. Revisa apenas abras la página (ej. llegas a las 8:00 AM)
-    checkAndAutoClear();
-
-    // 2. Por si acaso dejas la página abierta en la noche, se queda revisando.
-    const intervalId = setInterval(checkAndAutoClear, 60000); 
-
-    return () => clearInterval(intervalId);
-  }, [isAuthenticated, showNotification]);
-
-  // CONEXIÓN EN TIEMPO REAL A FIREBASE
+  // --- CONEXIÓN EN TIEMPO REAL Y LIMPIEZA INTELIGENTE FUSIONADA ---
   useEffect(() => {
     if (!isAuthenticated) return;
 
@@ -160,32 +109,76 @@ export default function App() {
     const q = query(collection(db, 'received_codes'));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      let fetchedCodes = snapshot.docs.map(docSnapshot => {
+      // Variables para la limpieza inteligente
+      const now = new Date();
+      const todayStr = now.toLocaleDateString();
+      const lastClear = localStorage.getItem('lastAutoClearDate');
+      const needsCleanup = lastClear !== todayStr; // ¿Ya limpiamos hoy?
+
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const todayMs = startOfToday.getTime();
+
+      let fetchedCodes = [];
+      const docsToDelete = [];
+
+      snapshot.docs.forEach(docSnapshot => {
         const data = docSnapshot.data();
         let timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
-        let timeValue = Date.now(); 
+        let docTimeMs = Date.now(); 
 
+        // Extraer la fecha real del código
         if (data.timestamp) {
           if (data.timestamp.toDate) {
-            timeValue = data.timestamp.toDate().getTime();
+            docTimeMs = data.timestamp.toDate().getTime();
             timeString = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
           } else if (typeof data.timestamp === 'string' || typeof data.timestamp === 'number') {
-            timeValue = new Date(data.timestamp).getTime();
-            timeString = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+            const parsedMs = new Date(data.timestamp).getTime();
+            if (!isNaN(parsedMs)) {
+              docTimeMs = parsedMs;
+              timeString = new Date(parsedMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+            }
           }
         }
 
-        // LÓGICA INTELIGENTE PARA DETECTAR Y RENOMBRAR HOTMAIL
-        let finalService = data.service;
-        const senderEmail = (data.email || '').toLowerCase(); 
-        
-        if (senderEmail.includes('accountprotection.microsoft.com') || senderEmail.includes('account-security-noreply')) {
-          finalService = 'Hotmail';
-        }
+        // LÓGICA DE PURGA: Si es de ayer o antes, y necesitamos limpiar, lo mandamos a borrar
+        if (needsCleanup && docTimeMs < todayMs) {
+          docsToDelete.push(docSnapshot.id);
+        } else {
+          // Si es un código de "hoy", lo procesamos para mostrarlo en pantalla
+          let finalService = data.service;
+          const senderEmail = (data.email || '').toLowerCase(); 
+          
+          if (senderEmail.includes('accountprotection.microsoft.com') || senderEmail.includes('account-security-noreply')) {
+            finalService = 'Hotmail';
+          }
 
-        return { id: docSnapshot.id, ...data, service: finalService, time: timeString, _sortTime: timeValue };
+          fetchedCodes.push({ id: docSnapshot.id, ...data, service: finalService, time: timeString, _sortTime: docTimeMs });
+        }
       });
+
+      // Si había basura antigua, la borramos discretamente en un solo "Lote" masivo
+      if (needsCleanup) {
+        if (docsToDelete.length > 0) {
+          const processBatches = async () => {
+            const batches = [];
+            for (let i = 0; i < docsToDelete.length; i += 500) {
+              const batch = writeBatch(db);
+              docsToDelete.slice(i, i + 500).forEach(id => {
+                batch.delete(doc(db, 'received_codes', id));
+              });
+              batches.push(batch.commit());
+            }
+            await Promise.all(batches);
+            showNotification(`Mantenimiento completado: ${docsToDelete.length} códigos antiguos eliminados.`, 'success');
+          };
+          processBatches();
+        }
+        // Marcamos el día como "limpio" para no volver a revisar hasta mañana
+        localStorage.setItem('lastAutoClearDate', todayStr);
+      }
       
+      // Ordenamos y mostramos solo los códigos que pasaron el filtro de hoy
       fetchedCodes.sort((a, b) => b._sortTime - a._sortTime);
       setCodes(fetchedCodes.slice(0, 100)); 
       setLoading(false);
@@ -195,7 +188,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, showNotification]);
 
   useEffect(() => {
     setCurrentPage(1);
