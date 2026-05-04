@@ -428,7 +428,7 @@ export default function App() {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-bold text-gray-900 dark:text-white">{item.service}</h3>
-                            {item.status === 'new' && <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">NUEVO</span>}
+                            {item.status === 'new' && <span className="bg-fuchsia-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">NUEVO</span>}
                           </div>
                           <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                             <span className="truncate max-w-[200px] font-bold text-blue-500 dark:text-blue-400">{displayEmail}</span>
