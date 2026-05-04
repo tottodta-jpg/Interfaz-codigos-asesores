@@ -442,7 +442,7 @@ export default function App() {
                           </a>
                         ) : (
                           <>
-                            <div className="bg-gray-100 dark:bg-slate-900/50 px-5 py-2.5 rounded-lg border border-gray-200 dark:border-slate-700 font-mono text-xl font-bold text-blue-600 dark:text-blue-500 flex-1 sm:flex-none text-center">
+                            <div className="bg-gray-100 dark:bg-slate-900/50 px-5 py-2.5 rounded-lg border border-gray-200 dark:border-slate-700 font-mono text-xl font-bold text-gray-900 dark:text-white flex-1 sm:flex-none text-center">
                               {cleanCode}
                             </div>
                             <button 
