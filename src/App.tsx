@@ -235,8 +235,9 @@ export default function App() {
     const sender = (item.email || '').toLowerCase();
     const isDisneyBot = sender.includes('disneyplus.com') || sender.includes('disney.com');
     const isNetflixBot = sender.includes('netflix.com');
+    const isHboBot = sender.includes('hbo.com') || sender.includes('hbomax.com') || sender.includes('max.com');
     
-    if (item.service === 'Hotmail' || isDisneyBot || isNetflixBot) {
+    if (item.service === 'Hotmail' || item.service === 'HBO' || isDisneyBot || isNetflixBot || isHboBot) {
       return item.destinatario || item.email || '';
     }
     return item.email || '';
