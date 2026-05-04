@@ -59,7 +59,16 @@ export default function App() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [copiedStates, setCopiedStates] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
+  const [nowMs, setNowMs] = useState(Date.now());
   const itemsPerPage = 10;
+
+  // Actualiza el reloj interno cada 1 minuto (60,000 ms) para verificar expiraciones de etiquetas "NUEVO"
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNowMs(Date.now());
+    }, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const showNotification = useCallback((message, type) => {
     setNotification({ message, type });
@@ -418,6 +427,7 @@ export default function App() {
                   const displayEmail = getDisplayEmail(item);
                   const isRead = item.status === 'read';
                   const cleanCode = item.code ? item.code.replace(/\s+/g, '') : '';
+                  const isRecent = (nowMs - item._sortTime) < (5 * 60 * 1000); // 5 minutos
 
                   return (
                     <div key={item.id} className={`p-4 sm:p-6 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${item.status === 'new' ? 'bg-blue-50/5 dark:bg-blue-900/5' : 'hover:bg-gray-50 dark:hover:bg-slate-800/80'}`}>
@@ -428,7 +438,7 @@ export default function App() {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-bold text-gray-900 dark:text-white">{item.service}</h3>
-                            {item.status === 'new' && <span className="bg-fuchsia-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">NUEVO</span>}
+                            {item.status === 'new' && isRecent && <span className="bg-fuchsia-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">NUEVO</span>}
                           </div>
                           <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                             <span className="truncate max-w-[200px] font-bold text-blue-500 dark:text-blue-400">{displayEmail}</span>
