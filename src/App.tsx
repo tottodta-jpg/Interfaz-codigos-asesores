@@ -341,7 +341,7 @@ export default function App() {
             <div>
               <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
                 <Inbox className="text-blue-600 dark:text-blue-400" />
-                Receptor Maestro de Códigos GM
+                Interfaz de Códigos GM
               </h1>
               <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 font-medium">
                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
