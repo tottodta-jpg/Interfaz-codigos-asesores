@@ -64,6 +64,9 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   
+  // NUEVO ESTADO PARA IDEA 2: Control visual individual de cada botón
+  const [copiedStates, setCopiedStates] = useState({});
+  
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -225,6 +228,13 @@ export default function App() {
       }
       showNotification(`Código copiado al portapapeles`, 'success');
       markAsRead(id);
+
+      // LÓGICA IDEA 2: Feedback visual inmediato en el botón
+      setCopiedStates(prev => ({ ...prev, [id]: true }));
+      setTimeout(() => {
+        setCopiedStates(prev => ({ ...prev, [id]: false }));
+      }, 2000);
+
     } catch (err) {
       showNotification('Error al copiar el código', 'error');
     }
@@ -589,10 +599,14 @@ export default function App() {
                           target="_blank" 
                           rel="noopener noreferrer"
                           onClick={() => markAsRead(item.id)}
-                          className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg font-medium text-sm transition-all shadow-sm flex items-center gap-2 w-full sm:w-auto justify-center"
+                          className={`px-5 py-2.5 rounded-lg font-medium text-sm transition-all shadow-sm flex items-center gap-2 w-full sm:w-auto justify-center ${
+                            item.status === 'read'
+                              ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-red-600 hover:bg-red-700 text-white'
+                          }`}
                         >
-                          <ExternalLink className="w-4 h-4" />
-                          Abrir Enlace
+                          {item.status === 'read' ? <CheckCircle2 className="w-4 h-4" /> : <ExternalLink className="w-4 h-4" />}
+                          {item.status === 'read' ? 'Enlace Usado' : 'Abrir Enlace'}
                         </a>
                       ) : (
                         <>
@@ -601,9 +615,27 @@ export default function App() {
                           </div>
                           <button 
                             onClick={() => copyToClipboard(cleanCode, item.id)}
-                            className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm hover:shadow active:scale-95 hover:bg-gray-50 dark:hover:bg-slate-700"
+                            className={`px-4 py-2 rounded-lg font-medium text-sm transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2 min-w-[110px] ${
+                              copiedStates[item.id]
+                                ? 'bg-green-500 border border-green-600 text-white'
+                                : item.status === 'read'
+                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
+                                : 'bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 hover:shadow'
+                            }`}
                           >
-                            Copiar
+                            {copiedStates[item.id] ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                ¡Copiado!
+                              </>
+                            ) : item.status === 'read' ? (
+                              <>
+                                <CheckCircle2 className="w-4 h-4" />
+                                Usado
+                              </>
+                            ) : (
+                              'Copiar'
+                            )}
                           </button>
                         </>
                       )}
