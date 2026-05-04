@@ -237,7 +237,9 @@ export default function App() {
     const isNetflixBot = sender.includes('netflix.com');
     const isHboBot = sender.includes('hbo.com') || sender.includes('hbomax.com') || sender.includes('max.com');
     
-    if (item.service === 'Hotmail' || item.service === 'HBO' || isDisneyBot || isNetflixBot || isHboBot) {
+    // CORRECCIÓN: Quitamos `item.service === 'HBO'` de aquí para no afectar los reenvíos de Gmail.
+    // Solo se usará el destinatario si realmente detectamos que el correo lo envió un robot oficial.
+    if (item.service === 'Hotmail' || isDisneyBot || isNetflixBot || isHboBot) {
       return item.destinatario || item.email || '';
     }
     return item.email || '';
