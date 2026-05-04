@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Mail, ShieldAlert, RefreshCw, Search, CheckCircle2, AlertCircle, Tv, Film, ExternalLink, Moon, Sun, ChevronLeft, ChevronRight, Inbox, Video, Trash2, Lock, LogOut, Filter } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-// IMPORTANTE: Se añadió getDocs para poder traer TODOS los registros al borrar
 import { getFirestore, collection, query, onSnapshot, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
 
 // TUS LLAVES REALES DE FIREBASE
@@ -72,26 +71,16 @@ export default function App() {
     setTimeout(() => setNotification(null), 3000);
   }, []);
 
-  // --- NUEVA LÓGICA DE LIMPIEZA PROFUNDA ---
-  const handleClearAll = useCallback(async (isAuto = false) => {
+  // --- LIMPIEZA MANUAL PROFUNDA (Botón "Limpiar BD") ---
+  const handleClearAll = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. Obtenemos TODOS los documentos directamente de la base de datos (ignora el límite de 100 de la vista)
       const snapshot = await getDocs(collection(db, 'received_codes'));
-      
-      // 2. Preparamos todas las órdenes de borrado
       const deletePromises = snapshot.docs.map(docSnap => deleteDoc(doc(db, 'received_codes', docSnap.id)));
-      
-      // 3. Ejecutamos el borrado masivo
       await Promise.all(deletePromises);
       
       setShowClearConfirm(false);
-      
-      if (isAuto === true) {
-        showNotification('Limpieza automática diaria (1:00 AM) completada', 'success');
-      } else {
-        showNotification('Base de datos limpiada completamente', 'success');
-      }
+      showNotification('Base de datos limpiada completamente', 'success');
     } catch (error) {
       console.error("Error limpiando:", error);
       showNotification('Error al limpiar base de datos', 'error');
@@ -99,34 +88,69 @@ export default function App() {
     setLoading(false);
   }, [showNotification]);
 
-  // --- LÓGICA DE AUTOMATIZACIÓN DE LAS 1:00 AM ---
+  // --- LÓGICA DE LIMPIEZA INTELIGENTE RETROACTIVA (Solo borra lo de ayer) ---
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    const checkAndAutoClear = () => {
+    const checkAndAutoClear = async () => {
       const now = new Date();
-      const currentHour = now.getHours();
       const todayStr = now.toLocaleDateString();
       const lastClear = localStorage.getItem('lastAutoClearDate');
 
-      // LÓGICA: Si es la 1 AM o más tarde (currentHour >= 1) y NO hemos limpiado en el día actual (todayStr)
-      // Esto funciona si dejan la página abierta, o si la abren en la mañana (ej. a las 8 AM).
-      if (currentHour >= 1 && lastClear !== todayStr) {
-        handleClearAll(true).then(() => {
-          // Guardamos la fecha de hoy para no volver a borrar hasta mañana
+      // Si es un día nuevo, ejecutamos la limpieza inteligente
+      if (lastClear !== todayStr) {
+        try {
+          const snapshot = await getDocs(collection(db, 'received_codes'));
+          
+          // Calculamos la hora exacta en la que inició el día de hoy (Medianoche)
+          const startOfToday = new Date();
+          startOfToday.setHours(0, 0, 0, 0);
+          const todayMs = startOfToday.getTime();
+          
+          const deletePromises = [];
+          
+          snapshot.docs.forEach(docSnap => {
+            const data = docSnap.data();
+            let docTimeMs = Date.now(); // Por defecto asume que es nuevo para protegerlo en caso de error
+            
+            // Extraemos la fecha del código con precisión
+            if (data.timestamp) {
+              if (data.timestamp.toDate) {
+                docTimeMs = data.timestamp.toDate().getTime();
+              } else if (typeof data.timestamp === 'string' || typeof data.timestamp === 'number') {
+                const parsedMs = new Date(data.timestamp).getTime();
+                if (!isNaN(parsedMs)) docTimeMs = parsedMs;
+              }
+            }
+
+            // Si la fecha del documento es anterior a la medianoche de hoy, lo marcamos para borrar
+            if (docTimeMs < todayMs) {
+              deletePromises.push(deleteDoc(doc(db, 'received_codes', docSnap.id)));
+            }
+          });
+
+          // Si encontró códigos viejos, los borra
+          if (deletePromises.length > 0) {
+            await Promise.all(deletePromises);
+            showNotification(`Mantenimiento matutino: ${deletePromises.length} códigos de días anteriores eliminados.`, 'success');
+          }
+
+          // Guardamos que ya se hizo la revisión de hoy
           localStorage.setItem('lastAutoClearDate', todayStr);
-        });
+        } catch (error) {
+          console.error("Error en limpieza automática:", error);
+        }
       }
     };
 
-    // 1. Revisar inmediatamente al abrir la página
+    // 1. Revisa apenas abras la página (ej. llegas a las 8:00 AM)
     checkAndAutoClear();
 
-    // 2. Quedarse revisando cada minuto (por si la pestaña se queda abierta 24/7)
-    const intervalId = setInterval(checkAndAutoClear, 60000); // 60000 ms = 1 minuto
+    // 2. Por si acaso dejas la página abierta en la noche, se queda revisando.
+    const intervalId = setInterval(checkAndAutoClear, 60000); 
 
     return () => clearInterval(intervalId);
-  }, [isAuthenticated, handleClearAll]);
+  }, [isAuthenticated, showNotification]);
 
   // CONEXIÓN EN TIEMPO REAL A FIREBASE
   useEffect(() => {
