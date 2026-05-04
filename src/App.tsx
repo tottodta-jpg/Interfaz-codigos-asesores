@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Mail, ShieldAlert, RefreshCw, Search, CheckCircle2, AlertCircle, Tv, Film, ExternalLink, Moon, Sun, ChevronLeft, ChevronRight, Inbox, Video, Trash2, Lock, LogOut, Filter } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, query, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+// IMPORTANTE: Se añadió getDocs para poder traer TODOS los registros al borrar
+import { getFirestore, collection, query, onSnapshot, doc, updateDoc, deleteDoc, getDocs } from 'firebase/firestore';
 
 // TUS LLAVES REALES DE FIREBASE
 const firebaseConfig = {
@@ -66,6 +67,67 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  const showNotification = useCallback((message, type) => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  }, []);
+
+  // --- NUEVA LÓGICA DE LIMPIEZA PROFUNDA ---
+  const handleClearAll = useCallback(async (isAuto = false) => {
+    setLoading(true);
+    try {
+      // 1. Obtenemos TODOS los documentos directamente de la base de datos (ignora el límite de 100 de la vista)
+      const snapshot = await getDocs(collection(db, 'received_codes'));
+      
+      // 2. Preparamos todas las órdenes de borrado
+      const deletePromises = snapshot.docs.map(docSnap => deleteDoc(doc(db, 'received_codes', docSnap.id)));
+      
+      // 3. Ejecutamos el borrado masivo
+      await Promise.all(deletePromises);
+      
+      setShowClearConfirm(false);
+      
+      if (isAuto === true) {
+        showNotification('Limpieza automática diaria (1:00 AM) completada', 'success');
+      } else {
+        showNotification('Base de datos limpiada completamente', 'success');
+      }
+    } catch (error) {
+      console.error("Error limpiando:", error);
+      showNotification('Error al limpiar base de datos', 'error');
+    }
+    setLoading(false);
+  }, [showNotification]);
+
+  // --- LÓGICA DE AUTOMATIZACIÓN DE LAS 1:00 AM ---
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const checkAndAutoClear = () => {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const todayStr = now.toLocaleDateString();
+      const lastClear = localStorage.getItem('lastAutoClearDate');
+
+      // LÓGICA: Si es la 1 AM o más tarde (currentHour >= 1) y NO hemos limpiado en el día actual (todayStr)
+      // Esto funciona si dejan la página abierta, o si la abren en la mañana (ej. a las 8 AM).
+      if (currentHour >= 1 && lastClear !== todayStr) {
+        handleClearAll(true).then(() => {
+          // Guardamos la fecha de hoy para no volver a borrar hasta mañana
+          localStorage.setItem('lastAutoClearDate', todayStr);
+        });
+      }
+    };
+
+    // 1. Revisar inmediatamente al abrir la página
+    checkAndAutoClear();
+
+    // 2. Quedarse revisando cada minuto (por si la pestaña se queda abierta 24/7)
+    const intervalId = setInterval(checkAndAutoClear, 60000); // 60000 ms = 1 minuto
+
+    return () => clearInterval(intervalId);
+  }, [isAuthenticated, handleClearAll]);
+
   // CONEXIÓN EN TIEMPO REAL A FIREBASE
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -123,11 +185,6 @@ export default function App() {
     }, 800);
   };
 
-  const showNotification = (message, type) => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
-  };
-
   const markAsRead = async (id) => {
     try {
       const docRef = doc(db, 'received_codes', id);
@@ -168,23 +225,19 @@ export default function App() {
     return item.email || '';
   };
 
-  // --- NUEVA LÓGICA INTELIGENTE: EXTRAER EL ENLACE CORRECTO (ESPECIAL NETFLIX) ---
+  // --- LÓGICA INTELIGENTE: EXTRAER EL ENLACE CORRECTO (ESPECIAL NETFLIX) ---
   const getDisplayUrl = (item) => {
     let rawData = item.url || item.code || '';
     if (!rawData) return '#';
 
-    // Buscamos todas las URLs posibles que Make haya enviado en el texto
     const urlRegex = /(https?:\/\/[^\s"'<>]+)/g;
     const urls = rawData.match(urlRegex);
 
-    // Si no hay múltiples URLs detectadas, devolvemos lo original limpiando espacios
     if (!urls || urls.length === 0) {
       return rawData.replace(/\s+/g, '');
     }
 
-    // Regla de aislamiento solo para Netflix
     if (item.service === 'Netflix') {
-      // 1. Filtramos la basura obvia que nunca es un botón de acción principal
       let validUrls = urls.filter(url => {
         const lowerUrl = url.toLowerCase();
         return !lowerUrl.includes('help.netflix.com') && 
@@ -195,34 +248,13 @@ export default function App() {
                !lowerUrl.includes('netflix.com/browse');
       });
 
-      // Si por alguna razón se filtraron todas (muy raro), devolvemos la primera original
       if (validUrls.length === 0) return urls[0];
 
-      // 2. HEURÍSTICA MAESTRA: Los botones rojos de acción en Netflix (Actualizar Hogar o 
-      // Restablecer Contraseña) SIEMPRE tienen un token temporal que los hace las URLs 
-      // más largas de todo el correo. Los links de texto normales son mucho más cortos.
       validUrls.sort((a, b) => b.length - a.length);
-
-      // Devolvemos la URL más larga, ignorando el orden en el que aparecieron en el correo
       return validUrls[0];
     }
 
-    // Para Disney+, HBO u otros servicios de enlaces, conservamos la regla de devolver el primero
     return urls[0];
-  };
-
-  const handleClearAll = async () => {
-    setLoading(true);
-    try {
-      const deletePromises = codes.map(item => deleteDoc(doc(db, 'received_codes', item.id)));
-      await Promise.all(deletePromises);
-      setShowClearConfirm(false);
-      showNotification('Base de datos limpiada exitosamente', 'success');
-    } catch (error) {
-      console.error("Error limpiando:", error);
-      showNotification('Error al limpiar base de datos', 'error');
-    }
-    setLoading(false);
   };
 
   const availableDomains = useMemo(() => {
@@ -456,7 +488,7 @@ export default function App() {
                     <div className="flex items-center gap-2 animate-fade-in-down">
                       <span className="text-sm text-gray-600 dark:text-gray-300">¿Seguro?</span>
                       <button 
-                        onClick={handleClearAll} 
+                        onClick={() => handleClearAll()} 
                         className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors"
                       >
                         Sí, limpiar BD
