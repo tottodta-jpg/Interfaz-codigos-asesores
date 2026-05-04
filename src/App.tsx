@@ -128,7 +128,6 @@ export default function App() {
           let finalService = data.service;
           const senderEmail = (data.email || '').toLowerCase();
           
-          // Lógica de identificación de servicios por remitente
           if (senderEmail.includes('microsoft') || senderEmail.includes('outlook')) finalService = 'Hotmail';
           if (senderEmail.includes('amazon') || senderEmail.includes('prime')) finalService = 'Prime Video';
           
@@ -180,22 +179,45 @@ export default function App() {
   };
 
   /**
-   * FUNCIÓN ACTUALIZADA: getDisplayEmail
-   * Ahora detecta si el remitente es GoPlay para mostrar el correo de la cuenta asociada.
+   * FUNCIÓN DE EXTRACCIÓN AVANZADA: getDisplayEmail
+   * 1. Detecta GoPlay y busca correos dentro del asunto (donde GoPlay pone la cuenta).
+   * 2. Mantiene la lógica original para Disney (cPanel) y Hotmail.
    */
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
-    // Añadimos 'goplay' a la detección de bots/remitentes automáticos
-    const isBot = /disney|netflix|hbo|max|microsoft|prime|amazon|paramount|goplay/.test(sender);
-    
-    // Si es un bot o GoPlay, mostramos el destinatario (que es la cuenta de streaming)
-    return isBot ? (item.destinatario || item.email) : item.email;
+    const subject = (item.subject || '');
+    const dest = (item.destinatario || '').toLowerCase();
+
+    // EXTRACCIÓN PARA GOPLAY (Caso especial de las capturas)
+    if (sender.includes('goplay')) {
+      const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/gi;
+      
+      // Prioridad 1: Buscar correo en el Asunto (Subject)
+      const foundInSubject = subject.match(emailRegex);
+      if (foundInSubject && foundInSubject.length > 0) return foundInSubject[0];
+
+      // Prioridad 2: Buscar correo en el campo Destinatario (si no es el de reenvío genérico)
+      if (dest && !dest.includes('app@goplay') && !dest.includes('gomakers001')) {
+          return item.destinatario;
+      }
+      
+      // Prioridad 3: Buscar correo en el cuerpo del mensaje (si existe campo body)
+      const foundInBody = (item.body || '').match(emailRegex);
+      if (foundInBody && foundInBody.length > 0) return foundInBody[0];
+    }
+
+    // LÓGICA PARA BOTs ESTÁNDAR (Netflix, Disney Directo, Hotmail)
+    const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
+    if (isBot && item.destinatario) return item.destinatario;
+
+    return item.email || 'Sin correo';
   };
 
   const filteredCodes = useMemo(() => {
     return codes.filter(item => {
       const email = getDisplayEmail(item).toLowerCase();
-      const matchesSearch = email.includes(searchTerm.toLowerCase());
+      const matchesSearch = email.includes(searchTerm.toLowerCase()) || 
+                           (item.subject || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesService = filterService === 'All' || item.service === filterService;
       const domain = email.split('@')[1] || '';
       const matchesDomain = filterDomain === 'All' || domain === filterDomain;
@@ -289,7 +311,7 @@ export default function App() {
             <div className="md:col-span-5 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
-                type="text" placeholder="Buscar correo..." value={searchTerm}
+                type="text" placeholder="Buscar cuenta o correo..." value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none focus:ring-2 focus:ring-blue-500 outline-none"
               />
@@ -350,16 +372,16 @@ export default function App() {
                         <div className={`p-4 rounded-2xl ${styles.bg} ${styles.color}`}>
                           {styles.icon}
                         </div>
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-black text-slate-900 dark:text-white">{item.service}</h3>
+                            <h3 className="font-black text-slate-900 dark:text-white truncate">{item.service}</h3>
                             {item.status === 'new' && <span className="bg-blue-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">Nuevo</span>}
                           </div>
                           <div className="flex items-center gap-2 text-sm text-slate-500 font-semibold mt-0.5">
-                            <span className="truncate max-w-[200px]">{displayEmail}</span>
+                            <span className="truncate max-w-[250px]">{displayEmail}</span>
                             <button 
                               onClick={() => copyToClipboard(displayEmail, item.id, 'email')}
-                              className="p-1 hover:text-blue-500 transition-colors"
+                              className="p-1 hover:text-blue-500 transition-colors shrink-0"
                               title="Copiar Correo"
                             >
                               {copiedStates[`email-${item.id}`] ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -385,7 +407,7 @@ export default function App() {
                             </div>
                             <button 
                               onClick={() => copyToClipboard(item.code, item.id)}
-                              className={`px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all active:scale-95 ${copiedStates[`code-${item.id}`] ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 text-slate-600 dark:text-slate-300'}`}
+                              className={`px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all active:scale-95 min-w-[100px] justify-center ${copiedStates[`code-${item.id}`] ? 'bg-emerald-500 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-blue-500 text-slate-600 dark:text-slate-300'}`}
                             >
                               {copiedStates[`code-${item.id}`] ? <Check /> : isRead ? 'Usado' : 'Copiar'}
                             </button>
@@ -402,8 +424,8 @@ export default function App() {
               <div className="p-6 bg-slate-50 dark:bg-slate-900/50 flex justify-between items-center border-t border-slate-100 dark:border-slate-800">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Página {currentPage} de {totalPages}</span>
                 <div className="flex gap-2">
-                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 bg-white dark:bg-slate-800 rounded-lg disabled:opacity-30"><ChevronLeft /></button>
-                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 bg-white dark:bg-slate-800 rounded-lg disabled:opacity-30"><ChevronRight /></button>
+                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 bg-white dark:bg-slate-800 rounded-lg disabled:opacity-30 transition-all"><ChevronLeft /></button>
+                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 bg-white dark:bg-slate-800 rounded-lg disabled:opacity-30 transition-all"><ChevronRight /></button>
                 </div>
               </div>
             )}
