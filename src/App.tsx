@@ -1,17 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { 
-  Mail, ShieldAlert, RefreshCw, Search, CheckCircle2, AlertCircle, 
-  Tv, Film, ExternalLink, Moon, Sun, ChevronLeft, ChevronRight, 
-  Inbox, Video, Trash2, Lock, LogOut, Filter, Copy, Play, 
-  User, Check
-} from 'lucide-react';
+import { Mail, ShieldAlert, RefreshCw, Search, CheckCircle2, AlertCircle, Tv, Film, ExternalLink, Moon, Sun, ChevronLeft, ChevronRight, Inbox, Video, Trash2, Lock, LogOut, Filter, Copy, Check } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, collection, query, onSnapshot, doc, 
-  updateDoc, deleteDoc, getDocs, writeBatch 
-} from 'firebase/firestore';
+import { getFirestore, collection, query, onSnapshot, doc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 
-// CONFIGURACIÓN DE FIREBASE
+// TUS LLAVES REALES DE FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyCML0EpHjSK_9VY22_kAlS41qUHAmEl-zk",
   authDomain: "lector-codigos-77e09.firebaseapp.com",
@@ -21,50 +13,23 @@ const firebaseConfig = {
   appId: "1:551428025531:web:3a9ff4d7e8543927e74d9e"
 };
 
+// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --- COMPONENTES AUXILIARES ---
-
-const Notification = ({ message, type }) => (
-  <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg flex items-center gap-3 shadow-lg animate-fade-in transition-all ${
-    type === 'success' 
-      ? 'bg-green-600 text-white' 
-      : 'bg-red-600 text-white'
-  }`}>
-    {type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-    <span className="font-bold">{message}</span>
-  </div>
-);
-
-// --- APLICACIÓN PRINCIPAL ---
-
 export default function App() {
-  const USER_CORRECTO = 'admin';
-  const PASS_CORRECTA = 'secreto123';
-  const LOGO_URL = 'https://scontent.fbog2-4.fna.fbcdn.net/v/t39.30808-6/674956853_122171454344930844_2921257025913987444_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=13d280&_nc_ohc=PNV-tmLchfQQ7kNvwHvyrZi&_nc_oc=AdooOPRetGIeIqIyWvRsAbQxPPykR8JDGxfYSlzxAE4Oasyxm4z__JrMEECSo8rejzo&_nc_zt=23&_nc_ht=scontent.fbog2-4.fna&_nc_gid=Qh1vCcZ70AWbBfDwNyK-Cw&_nc_ss=7a3a8&oh=00_Af0wdJTptfLUqPo_2aqQSIMC_XmYI3GMCeLDqewQ7DSDjw&oe=69EAF9B0';
-
-  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('authDashboard') === 'true');
+  // --- SISTEMA DE LOGIN ---
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('authDashboard') === 'true';
+  });
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  
-  const [codes, setCodes] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterService, setFilterService] = useState('All');
-  const [filterDomain, setFilterDomain] = useState('All');
-  const [notification, setNotification] = useState(null);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [copiedStates, setCopiedStates] = useState({});
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
 
-  const showNotification = useCallback((message, type) => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
-  }, []);
+  const USER_CORRECTO = 'admin';
+  const PASS_CORRECTA = 'secreto123';
+  
+  const LOGO_URL = 'https://scontent.fbog2-4.fna.fbcdn.net/v/t39.30808-6/674956853_122171454344930844_2921257025913987444_n.jpg?_nc_cat=107&ccb=1-7&_nc_sid=13d280&_nc_ohc=PNV-tmLchfQQ7kNvwHvyrZi&_nc_oc=AdooOPRetGIeIqIyWvRsAbQxPPykR8JDGxfYSlzxAE4Oasyxm4z__JrMEECSo8rejzo&_nc_zt=23&_nc_ht=scontent.fbog2-4.fna&_nc_gid=Qh1vCcZ70AWbBfDwNyK-Cw&_nc_ss=7a3a8&oh=00_Af0wdJTptfLUqPo_2aqQSIMC_XmYI3GMCeLDqewQ7DSDjw&oe=69EAF9B0'; 
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -80,25 +45,51 @@ export default function App() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     localStorage.removeItem('authDashboard');
+    setUsernameInput('');
+    setPasswordInput('');
   };
 
-  const handleClearAll = async () => {
+  const [codes, setCodes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterService, setFilterService] = useState('All');
+  const [filterDomain, setFilterDomain] = useState('All');
+  const [notification, setNotification] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [copiedStates, setCopiedStates] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const showNotification = useCallback((message, type) => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  }, []);
+
+  const handleClearAll = useCallback(async () => {
     setLoading(true);
     try {
       const snapshot = await getDocs(collection(db, 'received_codes'));
-      const batch = writeBatch(db);
-      snapshot.docs.forEach(docSnap => batch.delete(docSnap.ref));
-      await batch.commit();
+      const batches = [];
+      for (let i = 0; i < snapshot.docs.length; i += 500) {
+        const batch = writeBatch(db);
+        snapshot.docs.slice(i, i + 500).forEach(docSnap => {
+          batch.delete(doc(db, 'received_codes', docSnap.id));
+        });
+        batches.push(batch.commit());
+      }
+      await Promise.all(batches);
       setShowClearConfirm(false);
-      showNotification('Base de datos limpiada', 'success');
+      showNotification('Base de datos limpiada completamente', 'success');
     } catch (error) {
-      showNotification('Error al limpiar', 'error');
+      showNotification('Error al limpiar base de datos', 'error');
     }
     setLoading(false);
-  };
+  }, [showNotification]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
+
     setLoading(true);
     const q = query(collection(db, 'received_codes'));
     
@@ -107,139 +98,161 @@ export default function App() {
       const todayStr = now.toLocaleDateString();
       const lastClear = localStorage.getItem('lastAutoClearDate');
       const needsCleanup = lastClear !== todayStr;
-      
+
       const startOfToday = new Date().setHours(0, 0, 0, 0);
+
       let fetchedCodes = [];
-      let docsToDelete = [];
+      const docsToDelete = [];
 
-      snapshot.docs.forEach(docSnap => {
-        const data = docSnap.data();
-        let docTimeMs = Date.now();
+      snapshot.docs.forEach(docSnapshot => {
+        const data = docSnapshot.data();
+        let timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        let docTimeMs = Date.now(); 
 
-        if (data.timestamp?.toDate) {
-          docTimeMs = data.timestamp.toDate().getTime();
-        } else if (data.timestamp) {
-          docTimeMs = new Date(data.timestamp).getTime();
+        if (data.timestamp) {
+          if (data.timestamp.toDate) {
+            docTimeMs = data.timestamp.toDate().getTime();
+            timeString = data.timestamp.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+          } else {
+            const parsedMs = new Date(data.timestamp).getTime();
+            if (!isNaN(parsedMs)) {
+              docTimeMs = parsedMs;
+              timeString = new Date(parsedMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+            }
+          }
         }
 
         if (needsCleanup && docTimeMs < startOfToday) {
-          docsToDelete.push(docSnap.ref);
+          docsToDelete.push(docSnapshot.id);
         } else {
           let finalService = data.service;
-          const senderEmail = (data.email || '').toLowerCase();
+          const senderEmail = (data.email || '').toLowerCase(); 
           
-          if (senderEmail.includes('microsoft') || senderEmail.includes('outlook')) finalService = 'Hotmail';
-          if (senderEmail.includes('amazon') || senderEmail.includes('prime')) finalService = 'Prime Video';
-          
-          fetchedCodes.push({
-            id: docSnap.id,
-            ...data,
-            service: finalService,
-            _sortTime: docTimeMs,
-            time: new Date(docTimeMs).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
-          });
+          if (senderEmail.includes('microsoft') || senderEmail.includes('outlook')) {
+            finalService = 'Hotmail';
+          }
+
+          fetchedCodes.push({ id: docSnapshot.id, ...data, service: finalService, time: timeString, _sortTime: docTimeMs });
         }
       });
 
       if (needsCleanup && docsToDelete.length > 0) {
-        const batch = writeBatch(db);
-        docsToDelete.forEach(ref => batch.delete(ref));
-        batch.commit();
+        const processBatches = async () => {
+          const batches = [];
+          for (let i = 0; i < docsToDelete.length; i += 500) {
+            const batch = writeBatch(db);
+            docsToDelete.slice(i, i + 500).forEach(id => {
+              batch.delete(doc(db, 'received_codes', id));
+            });
+            batches.push(batch.commit());
+          }
+          await Promise.all(batches);
+        };
+        processBatches();
         localStorage.setItem('lastAutoClearDate', todayStr);
       }
-
-      setCodes(fetchedCodes.sort((a, b) => b._sortTime - a._sortTime));
+      
+      fetchedCodes.sort((a, b) => b._sortTime - a._sortTime);
+      setCodes(fetchedCodes); 
       setLoading(false);
     }, (error) => {
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, showNotification]);
 
-  const copyToClipboard = async (text, id, type = 'code') => {
-    if (!text) return;
+  const markAsRead = async (id) => {
     try {
-      const input = document.createElement('textarea');
-      input.value = text;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand('copy');
-      document.body.removeChild(input);
+      const docRef = doc(db, 'received_codes', id);
+      await updateDoc(docRef, { status: 'read' });
+    } catch (error) {}
+  };
+
+  const copyToClipboard = (text, id, type = 'code') => {
+    try {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      textArea.remove();
       
       showNotification(`${type === 'code' ? 'Código' : 'Correo'} copiado`, 'success');
-      if (type === 'code') {
-        const docRef = doc(db, 'received_codes', id);
-        await updateDoc(docRef, { status: 'read' });
-      }
+      if (type === 'code') markAsRead(id);
 
       setCopiedStates(prev => ({ ...prev, [`${type}-${id}`]: true }));
-      setTimeout(() => setCopiedStates(prev => ({ ...prev, [`${type}-${id}`]: false })), 2000);
+      setTimeout(() => {
+        setCopiedStates(prev => ({ ...prev, [`${type}-${id}`]: false }));
+      }, 2000);
+
     } catch (err) {
       showNotification('Error al copiar', 'error');
     }
   };
 
   /**
-   * FUNCIÓN DE EXTRACCIÓN AVANZADA: getDisplayEmail
-   * Ajustada para ser infalible con GoPlay buscando específicamente en el Asunto.
+   * getDisplayEmail: Lógica exacta para extraer correos de GoPlay
    */
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
     const subject = (item.subject || '');
     const body = (item.body || '');
-    const dest = (item.destinatario || '').toLowerCase();
+    const destinatario = (item.destinatario || '').toLowerCase();
 
-    // EXTRACCIÓN PRIORITARIA PARA GOPLAY
+    // Si viene de GoPlay, extraemos la cuenta del asunto
     if (sender.includes('goplay')) {
-      const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
-      
-      // Intentar extraer del ASUNTO (Donde GoPlay pone la cuenta)
+      const emailRegex = /[a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+/gi;
       const matchSubject = subject.match(emailRegex);
       if (matchSubject && matchSubject.length > 0) return matchSubject[0];
 
-      // Intentar extraer del CUERPO
       const matchBody = body.match(emailRegex);
       if (matchBody && matchBody.length > 0) return matchBody[0];
 
-      // Si el destinatario no es el bot genérico de Make/Gomakers
-      if (dest && !dest.includes('app@goplay') && !dest.includes('gomakers')) return item.destinatario;
+      if (destinatario && !destinatario.includes('app@goplay') && !destinatario.includes('gomakers')) {
+        return item.destinatario;
+      }
     }
 
-    // LÓGICA ESTÁNDAR PARA BOTS (Netflix, Disney Directo, Hotmail)
+    // Lógica para bots de plataformas
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
     if (isBot && item.destinatario) return item.destinatario;
 
-    return item.email || 'Sin correo';
+    return item.email || '';
   };
 
   const filteredCodes = useMemo(() => {
     return codes.filter(item => {
-      const email = getDisplayEmail(item).toLowerCase();
-      const matchesSearch = email.includes(searchTerm.toLowerCase()) || 
+      const displayEmail = getDisplayEmail(item).toLowerCase();
+      const matchesSearch = displayEmail.includes(searchTerm.toLowerCase()) || 
                            (item.subject || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesService = filterService === 'All' || item.service === filterService;
-      const domain = email.split('@')[1] || '';
+      const domain = displayEmail.includes('@') ? displayEmail.split('@')[1] : '';
       const matchesDomain = filterDomain === 'All' || domain === filterDomain;
+
       return matchesSearch && matchesService && matchesDomain;
     });
   }, [codes, searchTerm, filterService, filterDomain]);
 
   const availableDomains = useMemo(() => {
-    const domains = new Set(codes.map(c => getDisplayEmail(c).split('@')[1]).filter(Boolean));
+    const domains = new Set();
+    codes.forEach(c => {
+      const email = getDisplayEmail(c);
+      if(email.includes('@')) domains.add(email.split('@')[1].toLowerCase());
+    });
     return ['All', ...Array.from(domains)];
   }, [codes]);
 
-  const paginatedCodes = filteredCodes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const totalPages = Math.ceil(filteredCodes.length / itemsPerPage);
+  const paginatedCodes = filteredCodes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const getServiceIcon = (service) => {
     switch (service) {
-      case 'Netflix': return <Tv className="w-5 h-5 text-red-500" />;
-      case 'Disney+': return <Film className="w-5 h-5 text-blue-500" />;
-      case 'HBO': return <Video className="w-5 h-5 text-purple-500" />;
-      case 'Hotmail': return <Mail className="w-5 h-5 text-cyan-500" />;
-      default: return <ShieldAlert className="w-5 h-5 text-gray-400" />;
+      case 'Netflix': return <Tv className="w-5 h-5 text-red-600 dark:text-red-500" />;
+      case 'Disney+': return <Film className="w-5 h-5 text-blue-600 dark:text-blue-500" />;
+      case 'HBO': return <Video className="w-5 h-5 text-purple-600 dark:text-purple-500" />;
+      case 'Hotmail': return <Mail className="w-5 h-5 text-cyan-600 dark:text-cyan-500" />;
+      default: return <ShieldAlert className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
     }
   };
 
@@ -247,22 +260,39 @@ export default function App() {
     return (
       <div className={isDarkMode ? 'dark' : ''}>
         <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 p-8 text-center">
-            <img src={LOGO_URL} alt="Logo" className="mx-auto mb-6 max-h-24 rounded-2xl" />
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Panel Maestro</h2>
-            <form onSubmit={handleLogin} className="space-y-4 text-left">
-              <input 
-                type="text" placeholder="Usuario" value={usernameInput}
-                onChange={e => setUsernameInput(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 text-white outline-none"
-              />
-              <input 
-                type="password" placeholder="Contraseña" value={passwordInput}
-                onChange={e => setPasswordInput(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 text-white outline-none"
-              />
-              {loginError && <p className="text-red-500 text-sm font-bold">{loginError}</p>}
-              <button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">Entrar</button>
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className="absolute top-6 right-6 p-2.5 rounded-full bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-slate-700"
+          >
+            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+          <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 p-8">
+            <div className="text-center mb-8">
+              <img src={LOGO_URL} alt="Logo" className="mx-auto mb-6 max-h-24 w-auto rounded-2xl" />
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Acceso Restringido</h2>
+              <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">Por favor, ingresa tus credenciales.</p>
+            </div>
+            <form onSubmit={handleLogin} className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario</label>
+                <input 
+                  type="text" value={usernameInput} onChange={(e) => setUsernameInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white outline-none"
+                  placeholder="Ingresa tu usuario" required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contraseña</label>
+                <input 
+                  type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white outline-none"
+                  placeholder="••••••••" required
+                />
+              </div>
+              {loginError && <div className="text-red-600 text-sm font-medium text-center">{loginError}</div>}
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">
+                Ingresar al Panel
+              </button>
             </form>
           </div>
         </div>
@@ -272,87 +302,101 @@ export default function App() {
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-4 md:p-8 font-sans text-gray-900 dark:text-gray-100 transition-colors">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-4 md:p-8 transition-colors">
         <div className="max-w-5xl mx-auto space-y-6">
           
-          {notification && <Notification {...notification} />}
-
-          {/* HEADER SIMPLE */}
-          <header className="flex justify-between items-center bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Inbox className="text-blue-500" /> Receptor de Códigos
-            </h1>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-500">
-                {isDarkMode ? <Sun /> : <Moon />}
+          <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                <Inbox className="text-blue-600 dark:text-blue-400" />
+                Receptor Maestro de Códigos
+              </h1>
+              <span className="flex items-center gap-1 text-sm text-green-600 dark:text-green-400 font-medium">
+                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                Conectado en vivo
+              </span>
+            </div>
+            <div className="mt-4 md:mt-0 flex items-center gap-3">
+              <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300">
+                {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
-              <button onClick={handleLogout} className="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-500" title="Salir">
-                <LogOut />
+              <button onClick={handleLogout} className="flex items-center gap-2 bg-gray-100 dark:bg-slate-700 hover:text-red-600 px-4 py-2.5 rounded-lg text-gray-600 dark:text-gray-300 font-medium transition-colors">
+                <LogOut className="w-4 h-4" /> Salir
               </button>
             </div>
           </header>
 
-          {/* BUSCADOR Y FILTROS */}
+          <div className="fixed top-4 right-4 z-50">
+            {notification && (
+              <div className={`p-4 rounded-lg flex items-center gap-3 shadow-lg ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'} text-white font-bold`}>
+                {notification.type === 'success' ? <CheckCircle2 /> : <AlertCircle />}
+                {notification.message}
+              </div>
+            )}
+          </div>
+
           <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 flex flex-col md:flex-row gap-4">
             <div className="flex-1 relative">
               <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input 
                 type="text" placeholder="Busca por cuenta o correo..." value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 rounded-lg text-white"
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none"
               />
             </div>
+
             <select
-              value={filterDomain} onChange={e => setFilterDomain(e.target.value)}
-              className="px-4 py-2 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-lg text-white"
+              value={filterDomain} onChange={(e) => setFilterDomain(e.target.value)}
+              className="pl-4 pr-8 py-2.5 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-200 rounded-lg outline-none cursor-pointer"
             >
               <option value="All">Todos los dominios</option>
               {availableDomains.filter(d => d !== 'All').map(d => <option key={d} value={d}>@{d}</option>)}
             </select>
+
             <div className="flex gap-2">
-              {['All', 'Netflix', 'Disney+', 'HBO', 'Hotmail'].map(s => (
-                <button 
-                  key={s} onClick={() => setFilterService(s)}
-                  className={`px-4 py-2 rounded-lg font-bold transition-all ${filterService === s ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-500'}`}
+              {['All', 'Netflix', 'Disney+', 'HBO', 'Hotmail'].map(service => (
+                <button
+                  key={service} onClick={() => setFilterService(service)}
+                  className={`px-4 py-2.5 rounded-lg font-bold transition-all ${filterService === service ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'}`}
                 >
-                  {s === 'All' ? 'Todos' : s}
+                  {service === 'All' ? 'Todos' : service}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* LISTADO ESTILO ORIGINAL */}
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 overflow-hidden">
             <div className="p-6 border-b border-gray-100 dark:border-slate-700 flex justify-between items-center">
-              <h2 className="text-lg font-bold flex items-center gap-2">
-                Bandeja de Entrada 
+              <h2 className="text-lg font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                Bandeja de Entrada
                 <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded-full">{filteredCodes.length}</span>
               </h2>
               {showClearConfirm ? (
-                <div className="flex items-center gap-2">
-                  <button onClick={handleClearAll} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-md font-bold">Limpiar BD</button>
-                  <button onClick={() => setShowClearConfirm(false)} className="text-xs bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-gray-200 px-3 py-1.5 rounded-md font-bold">No</button>
+                <div className="flex gap-2">
+                  <button onClick={() => handleClearAll()} className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-md font-bold">Limpiar BD</button>
+                  <button onClick={() => setShowClearConfirm(false)} className="text-xs bg-gray-200 dark:bg-slate-700 text-gray-800 dark:text-gray-200 px-3 py-1.5 rounded-md font-bold">Cancelar</button>
                 </div>
               ) : (
-                <button onClick={() => setShowClearConfirm(true)} className="flex items-center gap-2 text-sm text-gray-400 hover:text-red-500 transition-colors">
-                  <Trash2 className="w-4 h-4" /> Limpiar Todo
+                <button onClick={() => setShowClearConfirm(true)} className="flex items-center gap-1 text-sm text-gray-500 hover:text-red-600 transition-colors">
+                  <Trash2 className="w-4 h-4" />
+                  Limpiar Todo
                 </button>
               )}
             </div>
-
-            {paginatedCodes.length === 0 ? (
-              <div className="p-12 text-center text-gray-400">
+            
+            {filteredCodes.length === 0 ? (
+              <div className="p-12 text-center text-gray-500">
                 <Mail className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                <p>No hay registros que coincidan.</p>
+                <p className="font-medium">No hay registros.</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-slate-700">
-                {paginatedCodes.map(item => {
+                {paginatedCodes.map((item) => {
                   const displayEmail = getDisplayEmail(item);
                   const isRead = item.status === 'read';
 
                   return (
-                    <div key={item.id} className={`p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all ${item.status === 'new' ? 'bg-blue-50/5 dark:bg-blue-900/5' : 'hover:bg-gray-50/50 dark:hover:bg-slate-800/50'}`}>
+                    <div key={item.id} className={`p-4 sm:p-6 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${item.status === 'new' ? 'bg-blue-50/5 dark:bg-blue-900/5' : 'hover:bg-gray-50/50 dark:hover:bg-slate-800/50'}`}>
                       <div className="flex items-center gap-4">
                         <div className="p-3 bg-gray-100 dark:bg-slate-900 rounded-xl">
                           {getServiceIcon(item.service)}
@@ -368,7 +412,7 @@ export default function App() {
                               {copiedStates[`email-${item.id}`] ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5 opacity-40" />}
                             </button>
                           </div>
-                          <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">{item.time}</p>
+                          <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-wider">{item.time}</p>
                         </div>
                       </div>
 
@@ -376,21 +420,21 @@ export default function App() {
                         {item.type === 'link' ? (
                           <a 
                             href={item.url || item.code} target="_blank" rel="noreferrer"
-                            onClick={() => updateDoc(doc(db, 'received_codes', item.id), { status: 'read' })}
-                            className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center gap-2 flex-1 sm:flex-none justify-center ${isRead ? 'bg-gray-200 dark:bg-slate-700 text-gray-500' : 'bg-red-600 hover:bg-red-700 text-white'}`}
+                            onClick={() => markAsRead(item.id)}
+                            className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 flex-1 sm:flex-none ${isRead ? 'bg-gray-200 dark:bg-slate-700 text-gray-500' : 'bg-red-600 hover:bg-red-700 text-white'}`}
                           >
                             <ExternalLink className="w-4 h-4" /> {isRead ? 'Usado' : 'Abrir Enlace'}
                           </a>
                         ) : (
                           <>
-                            <div className="bg-gray-100 dark:bg-slate-900/50 px-5 py-2.5 rounded-lg border border-gray-200 dark:border-slate-700 font-mono text-xl font-bold tracking-widest text-blue-500 flex-1 sm:flex-none text-center">
+                            <div className="bg-gray-100 dark:bg-slate-900/50 px-5 py-2.5 rounded-lg border border-gray-200 dark:border-slate-700 font-mono text-xl font-bold text-blue-500 flex-1 sm:flex-none text-center">
                               {item.code?.replace(/\s+/g, '')}
                             </div>
                             <button 
                               onClick={() => copyToClipboard(item.code, item.id)}
                               className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2 min-w-[110px] ${copiedStates[`code-${item.id}`] ? 'bg-green-600 text-white' : 'bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 text-gray-500 hover:bg-gray-50 dark:hover:bg-slate-600'}`}
                             >
-                              {copiedStates[`code-${item.id}`] ? <Check /> : isRead ? <><Check className="w-4 h-4" /> Usado</> : 'Copiar'}
+                              {copiedStates[`code-${item.id}`] ? <Check className="w-4 h-4" /> : isRead ? <><Check className="w-4 h-4" /> Usado</> : 'Copiar'}
                             </button>
                           </>
                         )}
@@ -402,7 +446,7 @@ export default function App() {
             )}
             
             {totalPages > 1 && (
-              <div className="p-4 bg-gray-50 dark:bg-slate-800/50 flex justify-between items-center border-t border-gray-100 dark:border-slate-700">
+              <div className="p-4 border-t border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
                 <span className="text-xs font-bold text-gray-400">PÁGINA {currentPage} DE {totalPages}</span>
                 <div className="flex gap-2">
                   <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 bg-white dark:bg-slate-700 rounded-lg disabled:opacity-30"><ChevronLeft /></button>
