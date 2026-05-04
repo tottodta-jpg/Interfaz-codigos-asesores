@@ -195,16 +195,16 @@ export default function App() {
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
     
-    // Si el remitente es genérico de GoPlay, buscamos en el texto del mensaje
+    // Si el remitente es GoPlay, buscamos el email real en todos los campos de texto
     if (sender.includes('goplay')) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
       
-      // Combinamos subject y body para buscar la cuenta real
+      // Combinamos campos donde GoPlay suele escribir la cuenta
       const textToScan = `${item.subject || ''} ${item.body || ''} ${item.destinatario || ''} ${item.code || ''}`;
       const matches = textToScan.match(emailRegex);
       
       if (matches) {
-        // Buscamos un email que NO contenga goplay ni gomakers ni gmail genérico del sistema
+        // Buscamos un email que NO contenga palabras prohibidas del sistema
         const realAccount = matches.find(e => {
             const low = e.toLowerCase();
             return !low.includes('goplay') && !low.includes('gomakers');
@@ -213,7 +213,7 @@ export default function App() {
       }
     }
 
-    // Lógica estándar para otros bots directos
+    // Lógica para servicios que funcionan bien (Disney cPanel, Hotmail, etc)
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
     if (isBot && item.destinatario) return item.destinatario;
 
