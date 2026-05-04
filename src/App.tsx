@@ -191,32 +191,29 @@ export default function App() {
     }
   };
 
-  // FUNCIÓN DE EXTRACCIÓN MEJORADA: Escanea todos los campos por un email real
+  // FUNCIÓN DE EXTRACCIÓN MEJORADA: Filtra estrictamente GoPlay y Gomakers
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
     
-    // Si el remitente es genérico de GoPlay o similar, buscamos en todo el objeto
-    if (sender.includes('goplay') || sender.includes('gomakers')) {
-      // Expresión regular robusta para emails
+    // Si el remitente es genérico de GoPlay, buscamos en el texto del mensaje
+    if (sender.includes('goplay')) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
       
-      // Obtenemos todos los valores de tipo string del item (asunto, cuerpo, destinatario, etc)
-      const valuesToScan = Object.values(item).filter(v => typeof v === 'string');
+      // Combinamos subject y body para buscar la cuenta real
+      const textToScan = `${item.subject || ''} ${item.body || ''} ${item.destinatario || ''} ${item.code || ''}`;
+      const matches = textToScan.match(emailRegex);
       
-      for (const val of valuesToScan) {
-        const matches = val.match(emailRegex);
-        if (matches) {
-          // Buscamos un email que no sea de goplay ni del sistema de reenvío
-          const realAccount = matches.find(e => 
-            !e.toLowerCase().includes('goplay') && 
-            !e.toLowerCase().includes('gomakers')
-          );
-          if (realAccount) return realAccount;
-        }
+      if (matches) {
+        // Buscamos un email que NO contenga goplay ni gomakers ni gmail genérico del sistema
+        const realAccount = matches.find(e => {
+            const low = e.toLowerCase();
+            return !low.includes('goplay') && !low.includes('gomakers');
+        });
+        if (realAccount) return realAccount;
       }
     }
 
-    // Lógica estándar para otros bots
+    // Lógica estándar para otros bots directos
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
     if (isBot && item.destinatario) return item.destinatario;
 
@@ -410,7 +407,7 @@ export default function App() {
                             {item.status === 'new' && <span className="bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">NUEVO</span>}
                           </div>
                           <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                            <span className="truncate max-w-[200px]">{displayEmail}</span>
+                            <span className="truncate max-w-[200px] font-medium">{displayEmail}</span>
                           </div>
                           <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-wider">{item.time}</p>
                         </div>
