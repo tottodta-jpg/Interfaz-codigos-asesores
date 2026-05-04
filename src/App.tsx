@@ -191,36 +191,32 @@ export default function App() {
     }
   };
 
+  // FUNCIÓN DE EXTRACCIÓN MEJORADA: Escanea todos los campos por un email real
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
-    const subject = (item.subject || '');
-    const body = (item.body || '');
-    const destinatario = (item.destinatario || '').toLowerCase();
-
-    // EXTRACCIÓN AVANZADA PARA GOPLAY
-    if (sender.includes('goplay')) {
-      const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
+    
+    // Si el remitente es genérico de GoPlay o similar, buscamos en todo el objeto
+    if (sender.includes('goplay') || sender.includes('gomakers')) {
+      // Expresión regular robusta para emails
+      const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
       
-      // Buscamos en asunto
-      const matchesInSubject = subject.match(emailRegex);
-      if (matchesInSubject) {
-        const found = matchesInSubject.find(e => !e.includes('goplay') && !e.includes('gomakers'));
-        if (found) return found;
-      }
-
-      // Buscamos en cuerpo
-      const matchesInBody = body.match(emailRegex);
-      if (matchesInBody) {
-        const found = matchesInBody.find(e => !e.includes('goplay') && !e.includes('gomakers'));
-        if (found) return found;
-      }
-
-      if (destinatario && !destinatario.includes('app@goplay') && !destinatario.includes('gomakers')) {
-        return item.destinatario;
+      // Obtenemos todos los valores de tipo string del item (asunto, cuerpo, destinatario, etc)
+      const valuesToScan = Object.values(item).filter(v => typeof v === 'string');
+      
+      for (const val of valuesToScan) {
+        const matches = val.match(emailRegex);
+        if (matches) {
+          // Buscamos un email que no sea de goplay ni del sistema de reenvío
+          const realAccount = matches.find(e => 
+            !e.toLowerCase().includes('goplay') && 
+            !e.toLowerCase().includes('gomakers')
+          );
+          if (realAccount) return realAccount;
+        }
       }
     }
 
-    // Lógica para bots de plataformas
+    // Lógica estándar para otros bots
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
     if (isBot && item.destinatario) return item.destinatario;
 
@@ -415,7 +411,6 @@ export default function App() {
                           </div>
                           <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                             <span className="truncate max-w-[200px]">{displayEmail}</span>
-                            {/* Pequeño icono de copiar email opcional */}
                           </div>
                           <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-wider">{item.time}</p>
                         </div>
