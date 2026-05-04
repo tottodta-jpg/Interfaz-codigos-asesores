@@ -126,12 +126,24 @@ export default function App() {
         if (needsCleanup && docTimeMs < startOfToday) {
           docsToDelete.push(docSnapshot.id);
         } else {
-          // Normalizamos el nombre del servicio (quitamos espacios que puedan venir de Make)
           let finalService = (data.service || 'Netflix').trim();
           const senderEmail = (data.email || '').toLowerCase(); 
+          const subjectRaw = (data.subject || '').toLowerCase();
           
           if (senderEmail.includes('microsoft') || senderEmail.includes('outlook')) {
             finalService = 'Hotmail';
+          }
+
+          // --- AUTO-CORRECCIÓN INTELIGENTE DE SERVICIO PARA GOPLAY ---
+          if (senderEmail.includes('goplay') || senderEmail.includes('gomakers')) {
+             const textToAnalyze = `${subjectRaw} ${data.destinatario || ''}`.toLowerCase();
+             if (textToAnalyze.includes('disney')) {
+                 finalService = 'Disney+';
+             } else if (textToAnalyze.includes('hbo') || textToAnalyze.includes('max')) {
+                 finalService = 'HBO';
+             } else if (textToAnalyze.includes('netflix')) {
+                 finalService = 'Netflix';
+             }
           }
 
           fetchedCodes.push({ 
@@ -144,23 +156,19 @@ export default function App() {
         }
       });
 
-      // Si entramos en modo limpieza, ejecutamos los borrados y actualizamos la fecha de control
-      if (needsCleanup) {
-        if (docsToDelete.length > 0) {
-          const processBatches = async () => {
-            const batches = [];
-            for (let i = 0; i < docsToDelete.length; i += 500) {
-              const batch = writeBatch(db);
-              docsToDelete.slice(i, i + 500).forEach(id => {
-                batch.delete(doc(db, 'received_codes', id));
-              });
-              batches.push(batch.commit());
-            }
-            await Promise.all(batches);
-          };
-          processBatches();
-        }
-        // Actualizamos la marca de tiempo de limpieza hoy para no volver a entrar en este bucle
+      if (needsCleanup && docsToDelete.length > 0) {
+        const processBatches = async () => {
+          const batches = [];
+          for (let i = 0; i < docsToDelete.length; i += 500) {
+            const batch = writeBatch(db);
+            docsToDelete.slice(i, i + 500).forEach(id => {
+              batch.delete(doc(db, 'received_codes', id));
+            });
+            batches.push(batch.commit());
+          }
+          await Promise.all(batches);
+        };
+        processBatches();
         localStorage.setItem('lastAutoClearDate', todayStr);
       }
       
@@ -168,8 +176,6 @@ export default function App() {
       setCodes(fetchedCodes); 
       setLoading(false);
     }, (error) => {
-      console.error("Error en Firebase:", error);
-      showNotification("Error de conexión con la base de datos", "error");
       setLoading(false);
     });
 
@@ -195,7 +201,6 @@ export default function App() {
       showNotification(`Código copiado al portapapeles`, 'success');
       markAsRead(id);
 
-      // Feedback visual del botón
       setCopiedStates(prev => ({ ...prev, [id]: true }));
       setTimeout(() => {
         setCopiedStates(prev => ({ ...prev, [id]: false }));
@@ -206,25 +211,16 @@ export default function App() {
     }
   };
 
-  /**
-   * getDisplayEmail: Lógica ultra-segura para GoPlay
-   * Escanea absolutamente todos los campos buscando un email que NO sea del sistema.
-   */
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
-    
-    // Si el remitente es de GoPlay, o si los campos habituales contienen gomakers/goplay
     const isGeneric = sender.includes('goplay') || sender.includes('gomakers');
 
     if (isGeneric) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
-      
-      // Combinamos todos los textos posibles donde pueda estar la cuenta real
       const textToScan = `${item.subject || ''} ${item.body || ''} ${item.destinatario || ''} ${item.code || ''}`;
       const matches = textToScan.match(emailRegex);
       
       if (matches) {
-        // Buscamos el primer email que NO sea goplay ni gomakers
         const realAccount = matches.find(e => {
             const low = e.toLowerCase();
             return !low.includes('goplay') && !low.includes('gomakers');
@@ -233,9 +229,8 @@ export default function App() {
       }
     }
 
-    // Lógica para servicios estándar (Disney cPanel, Hotmail, etc)
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
-    if (isBot && item.destinatario && !item.destinatario.toLowerCase().includes('goplay')) {
+    if (isBot && item.destinatario && !item.destinatario.toLowerCase().includes('goplay') && !item.destinatario.toLowerCase().includes('gomakers')) {
         return item.destinatario;
     }
 
@@ -248,7 +243,6 @@ export default function App() {
       const matchesSearch = displayEmail.includes(searchTerm.toLowerCase()) || 
                            (item.subject || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                            (item.code || '').toLowerCase().includes(searchTerm.toLowerCase());
-      
       const matchesService = filterService === 'All' || item.service === filterService;
       const domain = displayEmail.includes('@') ? displayEmail.split('@')[1] : '';
       const matchesDomain = filterDomain === 'All' || domain === filterDomain;
@@ -285,35 +279,34 @@ export default function App() {
         <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center p-4">
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
-            className="absolute top-6 right-6 p-2.5 rounded-full bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+            className="absolute top-6 right-6 p-2.5 rounded-full bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 shadow-sm border border-gray-100 dark:border-slate-700"
           >
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
-          <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 p-8 transform transition-all">
+          <div className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-slate-700 p-8">
             <div className="text-center mb-8">
-              <img src={LOGO_URL} alt="Logo Empresa" className="mx-auto mb-6 max-h-24 w-auto object-contain drop-shadow-md rounded-2xl" />
+              <img src={LOGO_URL} alt="Logo" className="mx-auto mb-6 max-h-24 w-auto object-contain rounded-2xl" />
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Acceso Restringido</h2>
-              <p className="text-gray-500 dark:text-gray-400 mt-2 text-sm">Por favor, ingresa tus credenciales para acceder al panel de códigos.</p>
             </div>
             <form onSubmit={handleLogin} className="space-y-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usuario</label>
                 <input 
                   type="text" value={usernameInput} onChange={(e) => setUsernameInput(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                  placeholder="Ingresa tu usuario" required
+                  className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white outline-none"
+                  placeholder="Usuario" required
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Contraseña</label>
                 <input 
                   type="password" value={passwordInput} onChange={(e) => setPasswordInput(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  className="w-full px-4 py-3 rounded-lg bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white outline-none"
                   placeholder="••••••••" required
                 />
               </div>
-              {loginError && <div className="text-red-600 text-sm font-medium text-center bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">{loginError}</div>}
-              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md active:scale-[0.98]">
+              {loginError && <div className="text-red-600 text-sm font-medium text-center">{loginError}</div>}
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-colors">
                 Ingresar al Panel
               </button>
             </form>
@@ -325,7 +318,7 @@ export default function App() {
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-4 md:p-8 font-sans transition-colors">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 p-4 md:p-8 font-sans transition-colors duration-200">
         <div className="max-w-5xl mx-auto space-y-6">
           
           <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700">
@@ -343,7 +336,7 @@ export default function App() {
               <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2.5 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 transition-colors">
                 {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
               </button>
-              <button onClick={handleLogout} className="flex items-center gap-2 bg-gray-100 dark:bg-slate-700 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-600 dark:text-gray-300 hover:text-red-600 px-4 py-2.5 rounded-lg font-medium transition-colors border border-transparent hover:border-red-200">
+              <button onClick={handleLogout} className="flex items-center gap-2 bg-gray-100 dark:bg-slate-700 hover:text-red-600 px-4 py-2.5 rounded-lg text-gray-600 dark:text-gray-300 font-medium transition-colors border border-transparent hover:border-red-200">
                 <LogOut className="w-4 h-4" /> Salir
               </button>
             </div>
@@ -364,7 +357,7 @@ export default function App() {
               <input 
                 type="text" placeholder="Busca por cuenta o correo..." value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-600 text-gray-900 dark:text-white rounded-lg focus:outline-none"
               />
             </div>
 
@@ -459,18 +452,16 @@ export default function App() {
                                   ? 'bg-green-500 border border-green-600 text-white'
                                   : item.status === 'read'
                                   ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                                  : 'bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 hover:border-gray-300 dark:hover:border-slate-500 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 hover:shadow'
+                                  : 'bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
                               }`}
                             >
                               {copiedStates[item.id] ? (
                                 <>
-                                  <CheckCircle2 className="w-4 h-4" />
-                                  ¡Copiado!
+                                  <CheckCircle2 className="w-4 h-4" /> ¡Copiado!
                                 </>
                               ) : item.status === 'read' ? (
                                 <>
-                                  <CheckCircle2 className="w-4 h-4" />
-                                  Usado
+                                  <CheckCircle2 className="w-4 h-4" /> Usado
                                 </>
                               ) : (
                                 'Copiar'
@@ -486,11 +477,11 @@ export default function App() {
             )}
             
             {totalPages > 1 && (
-              <div className="p-4 border-t border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50/50 dark:bg-slate-800/50 transition-colors">
+              <div className="p-4 border-t border-gray-100 dark:border-slate-700 flex justify-between items-center bg-gray-50/50 dark:bg-slate-800/50">
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">PÁGINA {currentPage} DE {totalPages}</span>
                 <div className="flex gap-2">
-                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 bg-white dark:bg-slate-800 rounded-lg disabled:opacity-30 border border-gray-200 dark:border-slate-600 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"><ChevronLeft /></button>
-                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 bg-white dark:bg-slate-800 rounded-lg disabled:opacity-30 border border-gray-200 dark:border-slate-600 transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"><ChevronRight /></button>
+                  <button disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="p-2 bg-white dark:bg-slate-800 rounded-lg disabled:opacity-30 border border-gray-200 dark:border-slate-600"><ChevronLeft /></button>
+                  <button disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="p-2 bg-white dark:bg-slate-800 rounded-lg disabled:opacity-30 border border-gray-200 dark:border-slate-600"><ChevronRight /></button>
                 </div>
               </div>
             )}
