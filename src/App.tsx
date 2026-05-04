@@ -213,7 +213,10 @@ export default function App() {
 
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
-    const isGeneric = sender.includes('goplay') || sender.includes('gomakers');
+    const destinatario = (item.destinatario || '').toLowerCase();
+    
+    // Es genérico de GoPlay solo si el remitente dice goplay o es el correo exacto del sistema
+    const isGeneric = sender.includes('goplay') || sender === 'gomakers001@gmail.com';
 
     if (isGeneric) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
@@ -223,15 +226,19 @@ export default function App() {
       if (matches) {
         const realAccount = matches.find(e => {
             const low = e.toLowerCase();
-            return !low.includes('goplay') && !low.includes('gomakers');
+            // Bloqueamos el correo maestro exacto, permitiendo @gomakers.store
+            return !low.includes('goplay') && low !== 'gomakers001@gmail.com';
         });
         if (realAccount) return realAccount;
       }
     }
 
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
-    if (isBot && item.destinatario && !item.destinatario.toLowerCase().includes('goplay') && !item.destinatario.toLowerCase().includes('gomakers')) {
-        return item.destinatario;
+    if (isBot && item.destinatario) {
+        // Permitimos mostrar el destinatario a menos que sea la cuenta del sistema
+        if (destinatario !== 'gomakers001@gmail.com' && !destinatario.includes('goplay')) {
+            return item.destinatario;
+        }
     }
 
     return item.email || 'Sin correo';
