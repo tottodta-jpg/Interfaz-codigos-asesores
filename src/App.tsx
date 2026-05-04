@@ -203,7 +203,7 @@ export default function App() {
     if (sender.includes('goplay')) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
       
-      // Escaneamos subject y body (enviados desde Make)
+      // Combinamos campos donde GoPlay suele escribir la cuenta
       const textToScan = `${item.subject || ''} ${item.body || ''} ${item.destinatario || ''} ${item.code || ''}`;
       const matches = textToScan.match(emailRegex);
       
