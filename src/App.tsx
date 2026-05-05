@@ -135,24 +135,23 @@ export default function App() {
         if (needsCleanup && docTimeMs < startOfToday) {
           docsToDelete.push(docSnapshot.id);
         } else {
-          let finalService = (data.service || 'Netflix').trim();
           const senderEmail = (data.email || '').toLowerCase(); 
           const subjectRaw = (data.subject || '').toLowerCase();
+          const bodyRaw = (data.body || '').toLowerCase();
+          const combinedText = `${subjectRaw} ${senderEmail} ${bodyRaw}`.toLowerCase();
           
-          if (senderEmail.includes('microsoft') || senderEmail.includes('outlook')) {
-            finalService = 'Hotmail';
-          }
+          let finalService = (data.service || 'Netflix').trim();
 
-          // --- AUTO-CORRECCIÓN INTELIGENTE DE SERVICIO PARA GOPLAY ---
-          if (senderEmail.includes('goplay') || senderEmail.includes('gomakers')) {
-             const textToAnalyze = `${subjectRaw} ${data.destinatario || ''}`.toLowerCase();
-             if (textToAnalyze.includes('disney')) {
-                 finalService = 'Disney+';
-             } else if (textToAnalyze.includes('hbo') || textToAnalyze.includes('max')) {
-                 finalService = 'HBO';
-             } else if (textToAnalyze.includes('netflix')) {
-                 finalService = 'Netflix';
-             }
+          // --- DETECCIÓN INTELIGENTE GLOBAL DE SERVICIO ---
+          // Esta lógica ahora se aplica a TODOS los correos, no solo a GoPlay
+          if (combinedText.includes('disney')) {
+            finalService = 'Disney+';
+          } else if (combinedText.includes('hbo') || combinedText.includes('max')) {
+            finalService = 'HBO';
+          } else if (combinedText.includes('netflix')) {
+            finalService = 'Netflix';
+          } else if (senderEmail.includes('microsoft') || senderEmail.includes('outlook') || senderEmail.includes('hotmail')) {
+            finalService = 'Hotmail';
           }
 
           fetchedCodes.push({ 
