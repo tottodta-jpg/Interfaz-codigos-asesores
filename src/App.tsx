@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Mail, ShieldAlert, RefreshCw, Search, CheckCircle2, AlertCircle, Tv, Film, ExternalLink, Moon, Sun, ChevronLeft, ChevronRight, Inbox, Video, Trash2, Lock, LogOut, Filter, Copy, Check } from 'lucide-react';
+import { Mail, ShieldAlert, RefreshCw, Search, CheckCircle2, AlertCircle, Tv, Film, ExternalLink, Moon, Sun, ChevronLeft, ChevronRight, Inbox, Video, Trash2, Lock, LogOut, Filter, Copy, Check, ShieldCheck } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, query, onSnapshot, doc, updateDoc, deleteDoc, getDocs, writeBatch } from 'firebase/firestore';
 
@@ -22,6 +22,7 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('authDashboard') === 'true';
   });
+
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -62,7 +63,6 @@ export default function App() {
   const [nowMs, setNowMs] = useState(Date.now());
   const itemsPerPage = 10;
 
-  // Actualiza el reloj interno cada 1 minuto (60,000 ms) para verificar expiraciones de etiquetas "NUEVO"
   useEffect(() => {
     const interval = setInterval(() => {
       setNowMs(Date.now());
@@ -135,15 +135,14 @@ export default function App() {
         if (needsCleanup && docTimeMs < startOfToday) {
           docsToDelete.push(docSnapshot.id);
         } else {
-          const senderEmail = (data.email || '').toLowerCase(); 
+          const senderEmail = (data.email || '').toLowerCase();
           const subjectRaw = (data.subject || '').toLowerCase();
           const bodyRaw = (data.body || '').toLowerCase();
           const combinedText = `${subjectRaw} ${senderEmail} ${bodyRaw}`.toLowerCase();
           
+          // --- DETECCIÓN INTELIGENTE GLOBAL DE SERVICIO ---
           let finalService = (data.service || 'Netflix').trim();
 
-          // --- DETECCIÓN INTELIGENTE GLOBAL DE SERVICIO ---
-          // Esta lógica ahora se aplica a TODOS los correos, no solo a GoPlay
           if (combinedText.includes('disney')) {
             finalService = 'Disney+';
           } else if (combinedText.includes('hbo') || combinedText.includes('max')) {
@@ -152,6 +151,8 @@ export default function App() {
             finalService = 'Netflix';
           } else if (senderEmail.includes('microsoft') || senderEmail.includes('outlook') || senderEmail.includes('hotmail')) {
             finalService = 'Hotmail';
+          } else if (senderEmail.includes('redeban')) { // <--- AJUSTE REDEBAN
+            finalService = 'Redeban';
           }
 
           fetchedCodes.push({ 
@@ -213,7 +214,6 @@ export default function App() {
       setTimeout(() => {
         setCopiedStates(prev => ({ ...prev, [id]: false }));
       }, 2000);
-
     } catch (err) {
       showNotification('Error al copiar el código', 'error');
     }
@@ -223,28 +223,24 @@ export default function App() {
     const sender = (item.email || '').toLowerCase();
     const destinatario = (item.destinatario || '').toLowerCase();
     
-    // Es genérico de GoPlay solo si el remitente dice goplay o es el correo exacto del sistema
-    const isGeneric = sender.includes('goplay') || sender === 'gomakers001@gmail.com';
+    const isGeneric = sender.includes('goplay') || sender === 'g**********@gmail.com';
 
     if (isGeneric) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
       const textToScan = `${item.subject || ''} ${item.body || ''} ${item.destinatario || ''} ${item.code || ''}`;
       const matches = textToScan.match(emailRegex);
-      
       if (matches) {
         const realAccount = matches.find(e => {
             const low = e.toLowerCase();
-            // Bloqueamos el correo maestro exacto, permitiendo @gomakers.store
-            return !low.includes('goplay') && low !== 'gomakers001@gmail.com';
+            return !low.includes('goplay') && low !== 'g**********@gmail.com';
         });
         if (realAccount) return realAccount;
       }
     }
 
-    const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime/.test(sender);
+    const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime|redeban/.test(sender);
     if (isBot && item.destinatario) {
-        // Permitimos mostrar el destinatario a menos que sea la cuenta del sistema
-        if (destinatario !== 'gomakers001@gmail.com' && !destinatario.includes('goplay')) {
+        if (destinatario !== 'g**********@gmail.com' && !destinatario.includes('goplay')) {
             return item.destinatario;
         }
     }
@@ -284,6 +280,7 @@ export default function App() {
       case 'Disney+': return <Film className="w-5 h-5 text-blue-600 dark:text-blue-500" />;
       case 'HBO': return <Video className="w-5 h-5 text-purple-600 dark:text-purple-500" />;
       case 'Hotmail': return <Mail className="w-5 h-5 text-cyan-600 dark:text-cyan-500" />;
+      case 'Redeban': return <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-500" />; // <--- ICONO REDEBAN
       default: return <ShieldAlert className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
     }
   };
@@ -385,7 +382,7 @@ export default function App() {
             </select>
 
             <div className="flex gap-2 overflow-x-auto pb-1 md:pb-0">
-              {['All', 'Netflix', 'Disney+', 'HBO', 'Hotmail'].map(service => (
+              {['All', 'Netflix', 'Disney+', 'HBO', 'Hotmail', 'Redeban'].map(service => (
                 <button
                   key={service} onClick={() => setFilterService(service)}
                   className={`px-4 py-2.5 rounded-lg font-bold transition-all whitespace-nowrap ${filterService === service ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200'}`}
