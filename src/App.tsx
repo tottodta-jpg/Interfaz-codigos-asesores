@@ -140,6 +140,16 @@ export default function App() {
           const bodyRaw = (data.body || '').toLowerCase();
           const combinedText = `${subjectRaw} ${senderEmail} ${bodyRaw}`.toLowerCase();
           
+          // --- FILTRO DE EXCLUSIÓN QUIRÚRGICO (PROTECCIÓN ANTI-SPAM LEGAL) ---
+          // Esta lógica detecta si es Disney por el contenido (ideal para correos reenviados RV:)
+          // y si es el acuerdo legal. Al ser tan específico, NO AFECTA a Netflix ni otros servicios.
+          const isDisneyRelated = combinedText.includes('disney');
+          const isLegalAgreement = subjectRaw.includes('acuerdo de suscripción') || bodyRaw.includes('acuerdo de suscripción');
+          
+          if (isDisneyRelated && isLegalAgreement) {
+            return; // Ignoramos este correo basura de Disney+
+          }
+
           // --- DETECCIÓN INTELIGENTE GLOBAL DE SERVICIO ---
           let finalService = (data.service || 'Netflix').trim();
 
@@ -151,7 +161,7 @@ export default function App() {
             finalService = 'Netflix';
           } else if (senderEmail.includes('microsoft') || senderEmail.includes('outlook') || senderEmail.includes('hotmail')) {
             finalService = 'Hotmail';
-          } else if (senderEmail.includes('redeban')) { // <--- AJUSTE REDEBAN
+          } else if (senderEmail.includes('redeban')) { 
             finalService = 'Redeban';
           }
 
@@ -223,7 +233,7 @@ export default function App() {
     const sender = (item.email || '').toLowerCase();
     const destinatario = (item.destinatario || '').toLowerCase();
     
-    const isGeneric = sender.includes('goplay') || sender === 'g**********@gmail.com';
+    const isGeneric = sender.includes('goplay') || sender === 'gomakers001@gmail.com';
 
     if (isGeneric) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
@@ -232,7 +242,7 @@ export default function App() {
       if (matches) {
         const realAccount = matches.find(e => {
             const low = e.toLowerCase();
-            return !low.includes('goplay') && low !== 'g**********@gmail.com';
+            return !low.includes('goplay') && low !== 'gomakers001@gmail.com';
         });
         if (realAccount) return realAccount;
       }
@@ -240,7 +250,7 @@ export default function App() {
 
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime|redeban/.test(sender);
     if (isBot && item.destinatario) {
-        if (destinatario !== 'g**********@gmail.com' && !destinatario.includes('goplay')) {
+        if (destinatario !== 'gomakers001@gmail.com' && !destinatario.includes('goplay')) {
             return item.destinatario;
         }
     }
@@ -280,7 +290,7 @@ export default function App() {
       case 'Disney+': return <Film className="w-5 h-5 text-blue-600 dark:text-blue-500" />;
       case 'HBO': return <Video className="w-5 h-5 text-purple-600 dark:text-purple-500" />;
       case 'Hotmail': return <Mail className="w-5 h-5 text-cyan-600 dark:text-cyan-500" />;
-      case 'Redeban': return <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-500" />; // <--- ICONO REDEBAN
+      case 'Redeban': return <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-500" />;
       default: return <ShieldAlert className="w-5 h-5 text-gray-600 dark:text-gray-400" />;
     }
   };
