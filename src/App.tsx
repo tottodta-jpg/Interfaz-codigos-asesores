@@ -140,15 +140,14 @@ export default function App() {
           const bodyRaw = (data.body || '').toLowerCase();
           const combinedText = `${subjectRaw} ${senderEmail} ${bodyRaw}`.toLowerCase();
           
-          // --- FILTRO DE EXCLUSIÓN QUIRÚRGICO (PROTECCIÓN ANTI-SPAM LEGAL Y PUBLICIDAD) ---
+          // --- FILTRO DE EXCLUSIÓN QUIRÚRGICO (PROTECCIÓN ANTI-SPAM LEGAL) ---
+          // Esta lógica detecta si es Disney por el contenido (ideal para correos reenviados RV:)
+          // y si es el acuerdo legal. Al ser tan específico, NO AFECTA a Netflix ni otros servicios.
           const isDisneyRelated = combinedText.includes('disney');
           const isLegalAgreement = subjectRaw.includes('acuerdo de suscripción') || bodyRaw.includes('acuerdo de suscripción');
           
-          // Nuevo filtro: Bloquea cualquier correo que venga de "novedades@"
-          const isNovedades = senderEmail.includes('novedades@');
-          
-          if ((isDisneyRelated && isLegalAgreement) || isNovedades) {
-            return; // Ignoramos este correo basura y no lo mostramos en la interfaz
+          if (isDisneyRelated && isLegalAgreement) {
+            return; // Ignoramos este correo basura de Disney+
           }
 
           // --- DETECCIÓN INTELIGENTE GLOBAL DE SERVICIO ---
@@ -166,42 +165,12 @@ export default function App() {
             finalService = 'Redeban';
           }
 
-          // --- INTERCEPTOR DE LINKS DE NETFLIX (ACTUALIZAR HOGAR) ---
-          let finalCode = data.code || '';
-          let finalUrl = data.url || '';
-          let finalType = data.type || 'code';
-
-          if (finalService === 'Netflix') {
-            // Escaneamos todo el texto disponible que nos haya mandado Make
-            const textToScan = `${data.body || ''} ${data.code || ''} ${data.url || ''}`;
-            
-            // Expresión regular que busca el enlace exacto del botón rojo de Actualizar Hogar
-            const householdLinkRegex = /(https:\/\/www\.netflix\.com\/(?:account\/update-primary-location|[^"'\s]*lkid=UPDATE_HOUSEHOLD_REQUESTED_OTP_CTA)[^"'\s]*)/i;
-            const match = textToScan.match(householdLinkRegex);
-            
-            if (match) {
-              // Si encontramos el link correcto, limpiamos posibles códigos HTML extraños (&amp;)
-              const cleanUrl = match[1].replace(/&amp;/g, '&');
-              // Sobrescribimos el link de contraseña equivocado con el link correcto
-              finalUrl = cleanUrl;
-              finalCode = cleanUrl;
-              finalType = 'link'; 
-            } else if (finalUrl.includes('password') || finalCode.includes('password')) {
-              // Si no lo encuentra pero sabemos que es de contraseña, forzamos que sea enlace
-              finalType = 'link';
-            }
-          }
-
           fetchedCodes.push({ 
             id: docSnapshot.id, 
             ...data, 
             service: finalService, 
             time: timeString, 
-            _sortTime: docTimeMs,
-            // Guardamos nuestros valores interceptados y corregidos
-            code: finalCode,
-            url: finalUrl,
-            type: finalType
+            _sortTime: docTimeMs 
           });
         }
       });
