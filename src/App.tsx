@@ -140,14 +140,15 @@ export default function App() {
           const bodyRaw = (data.body || '').toLowerCase();
           const combinedText = `${subjectRaw} ${senderEmail} ${bodyRaw}`.toLowerCase();
           
-          // --- FILTRO DE EXCLUSIÓN QUIRÚRGICO (PROTECCIÓN ANTI-SPAM LEGAL) ---
-          // Esta lógica detecta si es Disney por el contenido (ideal para correos reenviados RV:)
-          // y si es el acuerdo legal. Al ser tan específico, NO AFECTA a Netflix ni otros servicios.
+          // --- FILTRO DE EXCLUSIÓN QUIRÚRGICO (PROTECCIÓN ANTI-SPAM LEGAL Y PUBLICIDAD) ---
           const isDisneyRelated = combinedText.includes('disney');
           const isLegalAgreement = subjectRaw.includes('acuerdo de suscripción') || bodyRaw.includes('acuerdo de suscripción');
           
-          if (isDisneyRelated && isLegalAgreement) {
-            return; // Ignoramos este correo basura de Disney+
+          // Nuevo filtro: Bloquea cualquier correo que venga de "novedades@"
+          const isNovedades = senderEmail.includes('novedades@');
+          
+          if ((isDisneyRelated && isLegalAgreement) || isNovedades) {
+            return; // Ignoramos este correo basura y no lo mostramos en la interfaz
           }
 
           // --- DETECCIÓN INTELIGENTE GLOBAL DE SERVICIO ---
@@ -170,7 +171,7 @@ export default function App() {
             ...data, 
             service: finalService, 
             time: timeString, 
-            _sortTime: docTimeMs 
+            _sortTime: docTimeMs
           });
         }
       });
