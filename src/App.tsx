@@ -154,15 +154,15 @@ export default function App() {
           // --- DETECCIÓN INTELIGENTE GLOBAL DE SERVICIO ---
           let finalService = (data.service || 'Netflix').trim();
 
-          if (combinedText.includes('disney')) {
+          // Damos prioridad a Netflix si el asunto o el texto es explícitamente de ellos
+          if (combinedText.includes('netflix')) {
+            finalService = 'Netflix';
+          } else if (combinedText.includes('disney')) {
             finalService = 'Disney+';
           } else if (combinedText.includes('hbo') || combinedText.includes('max')) {
             finalService = 'HBO';
-          } else if (combinedText.includes('netflix')) {
-            finalService = 'Netflix';
           } else if (combinedText.includes('microsoft') || senderEmail.includes('accountprotection')) {
-            // CORRECCIÓN: Solo marca "Hotmail" si dice Microsoft o viene de su correo oficial de seguridad,
-            // ya no marca correos de clientes reenviados desde un @hotmail.com personal.
+            // CORRECCIÓN: Solo marca "Hotmail" si dice Microsoft o viene de su correo oficial de seguridad
             finalService = 'Hotmail';
           } else if (combinedText.includes('redeban')) { 
             finalService = 'Redeban';
