@@ -144,7 +144,7 @@ export default function App() {
           const isDisneyRelated = combinedText.includes('disney');
           const isLegalAgreement = subjectRaw.includes('acuerdo de suscripción') || bodyRaw.includes('acuerdo de suscripción');
           
-          // Nuevo filtro: Bloquea cualquier correo que venga de "novedades@"
+          // Filtro: Bloquea cualquier correo que venga de "novedades@"
           const isNovedades = senderEmail.includes('novedades@');
           
           if ((isDisneyRelated && isLegalAgreement) || isNovedades) {
@@ -160,10 +160,15 @@ export default function App() {
             finalService = 'HBO';
           } else if (combinedText.includes('netflix')) {
             finalService = 'Netflix';
-          } else if (senderEmail.includes('microsoft') || senderEmail.includes('outlook') || senderEmail.includes('hotmail')) {
+          } else if (combinedText.includes('microsoft') || senderEmail.includes('accountprotection')) {
+            // CORRECCIÓN: Solo marca "Hotmail" si dice Microsoft o viene de su correo oficial de seguridad,
+            // ya no marca correos de clientes reenviados desde un @hotmail.com personal.
             finalService = 'Hotmail';
-          } else if (senderEmail.includes('redeban')) { 
+          } else if (combinedText.includes('redeban')) { 
             finalService = 'Redeban';
+          } else {
+             // Si no detecta nada específico, asume que es Netflix (el más común)
+             finalService = 'Netflix';
           }
 
           fetchedCodes.push({ 
