@@ -137,32 +137,24 @@ export default function App() {
         } else {
           const senderEmail = (data.email || '').toLowerCase();
           const subjectRaw = (data.subject || '').toLowerCase();
-          
-          // --- NUEVO: DECODIFICADOR SEGURO DEL CUERPO ---
-          let decodedBody = data.body || '';
-          try {
-            // Desencriptamos el texto seguro que enviará Make
-            decodedBody = decodeURIComponent(data.body || '');
-          } catch(e) {
-            decodedBody = data.body || '';
-          }
-          const bodyRaw = decodedBody.toLowerCase();
-          // ---------------------------------------------
-
+          const bodyRaw = (data.body || '').toLowerCase();
           const combinedText = `${subjectRaw} ${senderEmail} ${bodyRaw}`.toLowerCase();
           
-          // --- FILTRO DE EXCLUSIÓN QUIRÚRGICO ---
+          // --- FILTRO DE EXCLUSIÓN QUIRÚRGICO (PROTECCIÓN ANTI-SPAM LEGAL Y PUBLICIDAD) ---
           const isDisneyRelated = combinedText.includes('disney');
           const isLegalAgreement = subjectRaw.includes('acuerdo de suscripción') || bodyRaw.includes('acuerdo de suscripción');
+          
+          // Filtro: Bloquea cualquier correo que venga de "novedades@"
           const isNovedades = senderEmail.includes('novedades@');
           
           if ((isDisneyRelated && isLegalAgreement) || isNovedades) {
-            return; 
+            return; // Ignoramos este correo basura y no lo mostramos en la interfaz
           }
 
           // --- DETECCIÓN INTELIGENTE GLOBAL DE SERVICIO ---
           let finalService = (data.service || 'Netflix').trim();
 
+          // Damos prioridad a Netflix si el asunto o el texto es explícitamente de ellos
           if (combinedText.includes('netflix')) {
             finalService = 'Netflix';
           } else if (combinedText.includes('disney')) {
@@ -170,10 +162,12 @@ export default function App() {
           } else if (combinedText.includes('hbo') || combinedText.includes('max')) {
             finalService = 'HBO';
           } else if (combinedText.includes('microsoft') || senderEmail.includes('accountprotection')) {
+            // CORRECCIÓN: Solo marca "Hotmail" si dice Microsoft o viene de su correo oficial de seguridad
             finalService = 'Hotmail';
           } else if (combinedText.includes('redeban')) { 
             finalService = 'Redeban';
           } else {
+             // Si no detecta nada específico, asume que es Netflix (el más común)
              finalService = 'Netflix';
           }
 
@@ -245,28 +239,16 @@ export default function App() {
     const sender = (item.email || '').toLowerCase();
     const destinatario = (item.destinatario || '').toLowerCase();
     
-    const isGeneric = sender.includes('goplay') || sender.includes('gomakers') || sender.includes('dominioprime');
+    const isGeneric = sender.includes('goplay') || sender === 'gomakers001@gmail.com';
 
     if (isGeneric) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
-      
-      // --- NUEVO: DECODIFICADOR SEGURO DEL CUERPO ---
-      let decodedBody = item.body || '';
-      try {
-        decodedBody = decodeURIComponent(item.body || '');
-      } catch(e) {}
-      // ---------------------------------------------
-
-      const textToScan = `${item.subject || ''} ${decodedBody} ${item.destinatario || ''} ${item.code || ''}`;
+      const textToScan = `${item.subject || ''} ${item.body || ''} ${item.destinatario || ''} ${item.code || ''}`;
       const matches = textToScan.match(emailRegex);
       if (matches) {
         const realAccount = matches.find(e => {
             const low = e.toLowerCase();
-            return !low.includes('goplay') && 
-                   !low.includes('gomakers') && 
-                   !low.includes('dominioprime') &&
-                   !low.includes('@account.netflix.com') &&
-                   !low.includes('@netflix.com');
+            return !low.includes('goplay') && low !== 'gomakers001@gmail.com';
         });
         if (realAccount) return realAccount;
       }
@@ -274,7 +256,7 @@ export default function App() {
 
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime|redeban/.test(sender);
     if (isBot && item.destinatario) {
-        if (!destinatario.includes('gomakers') && !destinatario.includes('goplay') && !destinatario.includes('dominioprime')) {
+        if (destinatario !== 'gomakers001@gmail.com' && !destinatario.includes('goplay')) {
             return item.destinatario;
         }
     }
@@ -457,7 +439,7 @@ export default function App() {
                   const displayEmail = getDisplayEmail(item);
                   const isRead = item.status === 'read';
                   const cleanCode = item.code ? item.code.replace(/\s+/g, '') : '';
-                  const isRecent = (nowMs - item._sortTime) < (5 * 60 * 1000); 
+                  const isRecent = (nowMs - item._sortTime) < (5 * 60 * 1000); // 5 minutos
 
                   return (
                     <div key={item.id} className={`p-4 sm:p-6 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${item.status === 'new' ? 'bg-blue-50/5 dark:bg-blue-900/5' : 'hover:bg-gray-50 dark:hover:bg-slate-800/80'}`}>
@@ -538,22 +520,3 @@ export default function App() {
     </div>
   );
 }
-```eof
-
-### Paso 2: El Ajuste en Make.com (Enviar el correo oculto)
-
-Ahora que React está listo para desencriptar, vamos a decirle a Make que envíe el texto seguro:
-
-1. Ve a tu escenario en **Make.com** y abre tu módulo azul **HTTP**.
-2. Ubica la línea donde escribiste:
-   `"body": { "stringValue": "Cuerpo omitido" }`
-3. Borra la frase `Cuerpo omitido` (dejando las comillas).
-4. Dentro de las comillas, ve a la pestaña superior que tiene el ícono de una **"A"** (String functions) y haz clic en la función `encodeURL`.
-5. Se escribirá `encodeURL ()` en tu recuadro. Haz clic justo en el medio de los paréntesis.
-6. Ahora ve a la primera pestaña (la estrellita) y selecciona la variable rosa de tu correo que dice `Text content` (o `Text`).
-
-Visualmente en tu recuadro de Make, esa línea debería verse exactamente así:
-`"body": { "stringValue": "{{encodeURL(1.text)}}" }`
-
-**¡Guarda los cambios y haz la prueba final!**
-Al hacer esto, Make enviará el texto completo del correo pero convertido en formato seguro de web (ej. `%20Hola%0A...`), el JSON fluirá sin romperse jamás, y tu interfaz React lo traducirá de inmediato para mostrar en pantalla el anhelado `TishBonser8203@hotmail.com`.
