@@ -13,12 +13,10 @@ const firebaseConfig = {
   appId: "1:551428025531:web:3a9ff4d7e8543927e74d9e"
 };
 
-// Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 export default function App() {
-  // --- SISTEMA DE LOGIN ---
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     return localStorage.getItem('authDashboard') === 'true';
   });
@@ -138,23 +136,21 @@ export default function App() {
           const senderEmail = (data.email || '').toLowerCase();
           const subjectRaw = (data.subject || '').toLowerCase();
           const bodyRaw = (data.body || '').toLowerCase();
+          
           const combinedText = `${subjectRaw} ${senderEmail} ${bodyRaw}`.toLowerCase();
           
-          // --- FILTRO DE EXCLUSIÓN QUIRÚRGICO (PROTECCIÓN ANTI-SPAM LEGAL Y PUBLICIDAD) ---
+          // --- FILTRO ANTI-SPAM ---
           const isDisneyRelated = combinedText.includes('disney');
           const isLegalAgreement = subjectRaw.includes('acuerdo de suscripción') || bodyRaw.includes('acuerdo de suscripción');
-          
-          // Filtro: Bloquea cualquier correo que venga de "novedades@"
           const isNovedades = senderEmail.includes('novedades@');
           
           if ((isDisneyRelated && isLegalAgreement) || isNovedades) {
-            return; // Ignoramos este correo basura y no lo mostramos en la interfaz
+            return; 
           }
 
-          // --- DETECCIÓN INTELIGENTE GLOBAL DE SERVICIO ---
+          // --- DETECCIÓN DE SERVICIO ---
           let finalService = (data.service || 'Netflix').trim();
 
-          // Damos prioridad a Netflix si el asunto o el texto es explícitamente de ellos
           if (combinedText.includes('netflix')) {
             finalService = 'Netflix';
           } else if (combinedText.includes('disney')) {
@@ -162,12 +158,10 @@ export default function App() {
           } else if (combinedText.includes('hbo') || combinedText.includes('max')) {
             finalService = 'HBO';
           } else if (combinedText.includes('microsoft') || senderEmail.includes('accountprotection')) {
-            // CORRECCIÓN: Solo marca "Hotmail" si dice Microsoft o viene de su correo oficial de seguridad
             finalService = 'Hotmail';
           } else if (combinedText.includes('redeban')) { 
             finalService = 'Redeban';
           } else {
-             // Si no detecta nada específico, asume que es Netflix (el más común)
              finalService = 'Netflix';
           }
 
@@ -235,20 +229,28 @@ export default function App() {
     }
   };
 
+  // --- EXTRACTOR DE CORREOS ---
   const getDisplayEmail = (item) => {
     const sender = (item.email || '').toLowerCase();
     const destinatario = (item.destinatario || '').toLowerCase();
     
-    const isGeneric = sender.includes('goplay') || sender === 'gomakers001@gmail.com';
+    const isGeneric = sender.includes('goplay') || sender.includes('gomakers') || sender.includes('dominioprime');
 
     if (isGeneric) {
       const emailRegex = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
+      
+      // Escaneamos el cuerpo limpio que ahora viene gracias a escapeJSON
       const textToScan = `${item.subject || ''} ${item.body || ''} ${item.destinatario || ''} ${item.code || ''}`;
       const matches = textToScan.match(emailRegex);
+      
       if (matches) {
         const realAccount = matches.find(e => {
             const low = e.toLowerCase();
-            return !low.includes('goplay') && low !== 'gomakers001@gmail.com';
+            return !low.includes('goplay') && 
+                   !low.includes('gomakers') && 
+                   !low.includes('dominioprime') &&
+                   !low.includes('@account.netflix.com') &&
+                   !low.includes('@netflix.com');
         });
         if (realAccount) return realAccount;
       }
@@ -256,7 +258,7 @@ export default function App() {
 
     const isBot = /disney|netflix|hbo|max|microsoft|amazon|prime|redeban/.test(sender);
     if (isBot && item.destinatario) {
-        if (destinatario !== 'gomakers001@gmail.com' && !destinatario.includes('goplay')) {
+        if (!destinatario.includes('gomakers') && !destinatario.includes('goplay') && !destinatario.includes('dominioprime')) {
             return item.destinatario;
         }
     }
@@ -439,7 +441,7 @@ export default function App() {
                   const displayEmail = getDisplayEmail(item);
                   const isRead = item.status === 'read';
                   const cleanCode = item.code ? item.code.replace(/\s+/g, '') : '';
-                  const isRecent = (nowMs - item._sortTime) < (5 * 60 * 1000); // 5 minutos
+                  const isRecent = (nowMs - item._sortTime) < (5 * 60 * 1000); 
 
                   return (
                     <div key={item.id} className={`p-4 sm:p-6 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${item.status === 'new' ? 'bg-blue-50/5 dark:bg-blue-900/5' : 'hover:bg-gray-50 dark:hover:bg-slate-800/80'}`}>
